@@ -1982,9 +1982,14 @@ function setupIpcHandlers() {
         try {
           const owner = 'Achimboldi';
           const repo = 'Elysia-personal-assistant';
+          // 净化字段：去除 GitHub API 不接受的控制字符（\n \r \t 等）
+          const sanitize = (str) => String(str || '')
+            .replace(/[\x00-\x1F\x7F]+/g, ' ')  // ASCII 控制字符 → 空格
+            .replace(/\s+/g, ' ')              // 合并连续空白
+            .trim();
           const patchBody = {};
-          if (hasDesc) patchBody.description = description;
-          if (hasHome) patchBody.homepage = homepage;
+          if (hasDesc) patchBody.description = sanitize(description).slice(0, 350); // GitHub 限制 350 字
+          if (hasHome) patchBody.homepage = sanitize(homepage);
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 15000);
