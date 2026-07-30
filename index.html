@@ -1351,9 +1351,20 @@
                                 <div class="version-status-icon"></div>
                                 <span class="version-status-text"></span>
                             </div>
+                            <!-- 提交说明 + 操作按钮（常用，放上面） -->
+                            <div class="version-upload-config" style="margin-bottom:4px;">
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label class="form-label" style="font-size:12px;">提交说明</label>
+                                    <textarea id="commitMessage" class="setting-input" style="width:100%; min-height:40px; resize:vertical;" placeholder="这次改动做了什么...（会作为 Git 提交信息显示在 GitHub 提交历史里）"></textarea>
+                                </div>
+                                <div class="version-actions-buttons">
+                                    <button id="cloudAppUploadBtn" class="btn btn-primary">同步到 GitHub</button>
+                                    <button id="cloudVersionListBtn" class="btn btn-secondary">从 GitHub 拉取更新</button>
+                                </div>
+                            </div>
+                            <!-- GitHub 仓库信息（不常变，放下面） -->
                             <div class="version-upload-config">
-                                <!-- GitHub 仓库元数据 -->
-                                <div style="padding-top:4px;">
+                                <div style="border-top:1px solid var(--border-color); padding-top:12px;">
                                     <h6 style="margin:0 0 12px 0; color:var(--text-secondary); font-size:13px;">GitHub 仓库信息</h6>
                                     
                                     <div class="form-group" style="margin-bottom:12px;">
@@ -1363,7 +1374,6 @@
                                             <button type="button" id="githubTokenToggleBtn" class="btn btn-sm btn-secondary" title="显示/隐藏" style="flex-shrink:0;">👁</button>
                                             <button type="button" id="githubTokenSaveBtn" class="btn btn-sm btn-primary" style="flex-shrink:0;">保存</button>
                                         </div>
-                                        <span style="font-size:10px; color:var(--text-secondary); margin-top:3px; display:block;">在 github.com/settings/tokens 创建，勾选 repo 权限。Token 保存在本地，不会上传到仓库。</span>
                                     </div>
 
                                     <div class="form-group" style="margin-bottom:12px;">
@@ -1381,10 +1391,6 @@
                                         <textarea id="githubReadmeContent" class="setting-input" style="width:100%; min-height:200px; resize:vertical; font-family:'Consolas','Courier New',monospace; font-size:11px;" placeholder="编辑 README.md，同步时将自动推送..."></textarea>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="version-actions-buttons">
-                                <button id="cloudAppUploadBtn" class="btn btn-primary">同步到 GitHub</button>
-                                <button id="cloudVersionListBtn" class="btn btn-secondary">从 GitHub 拉取更新</button>
                             </div>
                             <div class="version-list-container" id="versionListContainer" style="display: none;">
                                 <div class="version-list-header">
@@ -1718,6 +1724,6 @@
     <script src="xilian-settings.js"></script>
     <script src="chat-room-manager.js"></script>
     <script src="xilian-manager.js"></script>
-    <script src="app.js?v=2026073004"></script>
+    <script src="app.js?v=2026073005"></script>
 </body>
 </html>

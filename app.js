@@ -4557,6 +4557,7 @@ class AppController {
     const websiteInput = document.getElementById('githubWebsite');
     const readmeTextarea = document.getElementById('githubReadmeContent');
     const tokenInput = document.getElementById('githubTokenInput');
+    const commitMessageInput = document.getElementById('commitMessage');
 
     if (!uploadBtn || !progressDiv || !progressBar) {
       alert('同步界面元素未就绪，请重新打开设置页面');
@@ -4572,6 +4573,7 @@ class AppController {
     if (progressDetails) progressDetails.innerHTML = '';
 
     try {
+      const commitMsg = commitMessageInput ? commitMessageInput.value.trim() : '';
       const description = descriptionInput ? descriptionInput.value : '';
       const homepage = websiteInput ? websiteInput.value : '';
       const readmeContent = readmeTextarea ? readmeTextarea.value : undefined;
@@ -4586,7 +4588,7 @@ class AppController {
 
       const result = await ipcRenderer.invoke(
         'cloud-app-upload',
-        '', '', description, homepage, readmeContent, githubToken
+        '', commitMsg, description, homepage, readmeContent, githubToken
       );
 
       if (result.success) {

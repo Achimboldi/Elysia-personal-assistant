@@ -1968,8 +1968,8 @@ function setupIpcHandlers() {
 
       // ── 3. 提交与推送 ──
       const commitMsg = newVersionNote
-        ? `v${newVersion || ''}: ${newVersionNote}`
-        : `v${newVersion || getCurrentVersion()} - 版本同步`;
+        ? newVersionNote
+        : `v${getCurrentVersion()} - 版本同步`;
 
       const result = await updateMgr.pushChanges(sourceDir, commitMsg);
 
