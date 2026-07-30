@@ -302,7 +302,7 @@ const TOOL_DEFINITIONS = [
       parameters: {
         type: 'object',
         properties: {
-          date: { type: 'string', description: '日期 YYYY-MM-DD，默认今天' },
+          date: { type: 'string', description: '日期 YYYY-MM-DD，默认今天。⚠️ 除非用户明确说"写到X月X日"或"补写X号的日记"，否则不要传此参数，让系统默认用今天的日期。日记中提到"昨天发生的事"不等于要写到昨天的日期——日记的日期是写日记的那天。' },
           content: { type: 'string', description: '日志内容（必填）' },
           weather: {
             type: 'string',
