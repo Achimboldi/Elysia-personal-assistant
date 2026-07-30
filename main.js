@@ -219,9 +219,7 @@ function getUpdateManager() {
   if (!updateManager) {
     updateManager = new UpdateManager();
     updateManager.setLogger((msg) => safeLog('[UpdateManager] ' + msg));
-    if (cloudSync) {
-      updateManager.setCloudSync(cloudSync);
-    }
+    // ★ Git 模式不再依赖百度网盘 cloudSync
   }
   return updateManager;
 }
@@ -1938,327 +1936,83 @@ function setupIpcHandlers() {
     }
   });
 
+  // ★ Git 版：代码推送到 GitHub
   ipcMain.handle('cloud-app-upload', async (event, newVersion, newVersionNote) => {
     try {
-      if (!cloudSync) {
-        // 如果云同步未初始化，尝试使用保存的配置自动初始化
-        const settings = readData().settings || {};
-        const appId = settings.cloudAppId || '';
-        const appKey = settings.cloudAppKey || '';
-        const appSecret = settings.cloudAppSecret || '';
-        const token = settings.cloudToken || '';
-        const refreshToken = settings.cloudRefreshToken || '';
-        const tokenExpireTime = settings.cloudTokenExpireTime || 0;
-        const currentUserId = settings.cloudCurrentUserId || 'admin';
-        
-        if (!appId || !appKey || !appSecret) {
-          return { success: false, message: '请先填写云同步配置' };
-        }
-        
-        cloudSync = new CloudSync();
-        cloudSync.setUserId(currentUserId);
-        await cloudSync.init({
-          appId: appId,
-          appKey: appKey,
-          appSecret: appSecret,
-          token: token,
-          refreshToken: refreshToken,
-          tokenExpireTime: tokenExpireTime,
-          onTokenUpdate: async (tokenData) => {
-            const currentData = readData();
-            currentData.settings = currentData.settings || {};
-            currentData.settings.cloudToken = tokenData.token;
-            currentData.settings.cloudRefreshToken = tokenData.refreshToken;
-            currentData.settings.cloudTokenExpireTime = tokenData.tokenExpireTime;
-            await writeData(
-              currentData.tasks,
-              currentData.memos,
-              currentData.expenses,
-              currentData.budgets,
-              currentData.settings,
-              currentData.translationStats,
-              currentData.categoryBudgets || [],
-              currentData.secrets || [],
-              currentData.journals || []
-            );
-          }
-        });
-      }
-      
+      const updateMgr = getUpdateManager();
       const currentAppPath = getCurrentAppPath();
       const sourceDir = path.join(currentAppPath, 'resources', 'app');
-      
-      // 使用用户指定的版本号或默认版本号
-      const versionToUse = newVersion && newVersion.trim() ? newVersion.trim() : getCurrentVersion();
-      
-      // 先上传版本信息获取版本ID
-      const versionInfo = {
-        version: versionToUse,
-        uploadTime: new Date().toISOString(),
-        note: newVersionNote || ''
-      };
-      const versionResult = await cloudSync.uploadVersion(versionInfo);
-      
-      let versionId = null;
-      if (versionResult.success) {
-        versionId = versionResult.versionId;
-      }
-      
-      // 使用版本ID上传应用文件到指定目录
-      const uploadResult = await cloudSync.uploadAppFiles(sourceDir, (progress) => {
-        event.sender.send('cloud-app-upload-progress', progress);
-      }, versionId);
-      
-      // 创建并上传版本清单
-      const updateMgr = getUpdateManager();
-      updateMgr.setCloudSync(cloudSync);
-      const manifestResult = await updateMgr.createAndUploadManifest(sourceDir, versionId);
-      
-      let message = '';
-      let errors = [];
-      
-      if (uploadResult.success || uploadResult.uploadedCount > 0) {
-        message = `已上传 ${uploadResult.uploadedCount}/${uploadResult.totalCount} 个文件到云端，版本信息已更新（最多保存5个版本）`;
-        if (uploadResult.errors.length > 0) {
-          errors = [...errors, ...uploadResult.errors];
+
+      // 如果指定了新版本号，更新 package.json
+      if (newVersion && newVersion.trim()) {
+        const packageJsonPath = path.join(sourceDir, 'package.json');
+        if (fs.existsSync(packageJsonPath)) {
+          const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+          pkg.version = newVersion.trim();
+          fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
+          setCurrentVersion(newVersion.trim());
         }
-      } else {
-        return { success: false, message: '上传失败: ' + (uploadResult.errors.join('; ') || '未知错误') };
-      }
-      
-      if (manifestResult.success) {
-        const manifestFileCount = (manifestResult.manifest && Array.isArray(manifestResult.manifest.files))
-          ? manifestResult.manifest.files.length
-          : 0;
-        message += `\n版本清单已创建（${manifestFileCount} 个文件）`;
-      } else {
-        errors.push('版本清单创建失败: ' + manifestResult.message);
       }
 
-      if (errors.length > 0) {
-        message += '\n\n以下文件上传失败：' + errors.join('; ');
-      }
+      const commitMsg = newVersionNote
+        ? `v${newVersion || ''}: ${newVersionNote}`
+        : `v${newVersion || getCurrentVersion()} - 版本同步`;
 
-      setCurrentVersion(versionToUse);
-      
-      return { 
-        success: errors.length === 0, 
-        message,
-        errors: errors.length > 0 ? errors : undefined
-      };
-    } catch (e) {
-      safeError('上传应用文件失败:', e);
-      return { success: false, message: '上传应用文件失败: ' + e.message };
-    }
-  });
+      const result = await updateMgr.pushChanges(sourceDir, commitMsg);
 
-  ipcMain.handle('incremental-update-check', async (event) => {
-    try {
-      if (!cloudSync) {
-        const settings = readData().settings || {};
-        const appId = settings.cloudAppId || '';
-        const appKey = settings.cloudAppKey || '';
-        const appSecret = settings.cloudAppSecret || '';
-        const token = settings.cloudToken || '';
-        const refreshToken = settings.cloudRefreshToken || '';
-        const tokenExpireTime = settings.cloudTokenExpireTime || 0;
-        const currentUserId = settings.cloudCurrentUserId || 'admin';
-        
-        if (!appId || !appKey || !appSecret) {
-          return { success: false, message: '请先填写云同步配置' };
-        }
-        
-        cloudSync = new CloudSync();
-        cloudSync.setUserId(currentUserId);
-        await cloudSync.init({
-          appId: appId,
-          appKey: appKey,
-          appSecret: appSecret,
-          token: token,
-          refreshToken: refreshToken,
-          tokenExpireTime: tokenExpireTime,
-          onTokenUpdate: async (tokenData) => {
-            const currentData = readData();
-            currentData.settings = currentData.settings || {};
-            currentData.settings.cloudToken = tokenData.token;
-            currentData.settings.cloudRefreshToken = tokenData.refreshToken;
-            currentData.settings.cloudTokenExpireTime = tokenData.tokenExpireTime;
-            await writeData(
-              currentData.tasks,
-              currentData.memos,
-              currentData.expenses,
-              currentData.budgets,
-              currentData.settings,
-              currentData.translationStats,
-              currentData.categoryBudgets || [],
-              currentData.secrets || [],
-              currentData.journals || []
-            );
-          }
-        });
-      }
-      
-      const updateMgr = getUpdateManager();
-      updateMgr.setCloudSync(cloudSync);
-      
-      const result = await updateMgr.checkForUpdate(getCurrentVersion());
-      
-      if (result.success && result.hasUpdate) {
-        const currentAppPath = getCurrentAppPath();
-        const targetDir = path.join(currentAppPath, 'resources', 'app');
-        
-        const filesToCheck = [
-          'app.js', 'styles.css', 'index.html', 'main.js',
-          'detail.css', 'detail.html', 'detail.js',
-          'quick-task.css', 'quick-task.html', 'quick-task.js',
-          'reminder.css', 'reminder.html', 'reminder.js',
-          'sticky-note.css', 'sticky-note.html', 'sticky-note.js',
-          'color-picker.html', 'color-picker-module.js',
-          'cloud-sync.js', 'package.json', 'update-manager.js'
-        ];
-        
-        const localManifest = updateMgr.generateFileManifest(targetDir, filesToCheck);
-        const comparison = updateMgr.compareManifests(localManifest, result.manifest);
-        
-        return {
-          success: true,
-          hasUpdate: comparison.totalFilesToDownload > 0 || comparison.totalFilesToRemove > 0,
-          currentVersion: getCurrentVersion(),
-          fileCount: result.fileCount,
-          filesToDownload: comparison.filesToDownload,
-          filesToRemove: comparison.filesToRemove,
-          totalDownloadSize: comparison.totalDownloadSize
-        };
-      }
-      
       return result;
     } catch (e) {
-      safeError('检查增量更新失败:', e);
-      return { success: false, message: '检查增量更新失败: ' + e.message };
+      safeError('代码同步失败:', e);
+      return { success: false, message: '代码同步失败: ' + e.message };
     }
   });
 
-  ipcMain.handle('incremental-update-perform', async (event, versionId = null) => {
+  // ★ Git 版：检查远程更新
+  ipcMain.handle('incremental-update-check', async (event) => {
     try {
-      if (!cloudSync) {
-        const settings = readData().settings || {};
-        const appId = settings.cloudAppId || '';
-        const appKey = settings.cloudAppKey || '';
-        const appSecret = settings.cloudAppSecret || '';
-        const token = settings.cloudToken || '';
-        const refreshToken = settings.cloudRefreshToken || '';
-        const tokenExpireTime = settings.cloudTokenExpireTime || 0;
-        const currentUserId = settings.cloudCurrentUserId || 'admin';
-        
-        if (!appId || !appKey || !appSecret) {
-          return { success: false, message: '请先填写云同步配置' };
-        }
-        
-        cloudSync = new CloudSync();
-        cloudSync.setUserId(currentUserId);
-        await cloudSync.init({
-          appId: appId,
-          appKey: appKey,
-          appSecret: appSecret,
-          token: token,
-          refreshToken: refreshToken,
-          tokenExpireTime: tokenExpireTime,
-          onTokenUpdate: async (tokenData) => {
-            const currentData = readData();
-            currentData.settings = currentData.settings || {};
-            currentData.settings.cloudToken = tokenData.token;
-            currentData.settings.cloudRefreshToken = tokenData.refreshToken;
-            currentData.settings.cloudTokenExpireTime = tokenData.tokenExpireTime;
-            await writeData(
-              currentData.tasks,
-              currentData.memos,
-              currentData.expenses,
-              currentData.budgets,
-              currentData.settings,
-              currentData.translationStats,
-              currentData.categoryBudgets || [],
-              currentData.secrets || [],
-              currentData.journals || []
-            );
-          }
-        });
-      }
-      
       const updateMgr = getUpdateManager();
-      updateMgr.setCloudSync(cloudSync);
-      
       const currentAppPath = getCurrentAppPath();
       const targetDir = path.join(currentAppPath, 'resources', 'app');
-      
+
+      const result = await updateMgr.checkForUpdate(getCurrentVersion(), targetDir);
+
+      return result;
+    } catch (e) {
+      safeError('检查更新失败:', e);
+      return { success: false, message: '检查更新失败: ' + e.message };
+    }
+  });
+
+  // ★ Git 版：执行代码更新（git pull）
+  ipcMain.handle('incremental-update-perform', async (event, versionId = null) => {
+    try {
+      const updateMgr = getUpdateManager();
+      const currentAppPath = getCurrentAppPath();
+      const targetDir = path.join(currentAppPath, 'resources', 'app');
+
       const result = await updateMgr.performIncrementalUpdate(targetDir, versionId, (progress) => {
         event.sender.send('incremental-update-progress', progress);
       });
-      
+
       return result;
     } catch (e) {
-      safeError('执行增量更新失败:', e);
-      return { success: false, message: '执行增量更新失败: ' + e.message };
+      safeError('执行更新失败:', e);
+      return { success: false, message: '执行更新失败: ' + e.message };
     }
   });
 
+  // ★ Git 版：推送代码到 GitHub
   ipcMain.handle('incremental-update-create-manifest', async (event) => {
     try {
-      if (!cloudSync) {
-        const settings = readData().settings || {};
-        const appId = settings.cloudAppId || '';
-        const appKey = settings.cloudAppKey || '';
-        const appSecret = settings.cloudAppSecret || '';
-        const token = settings.cloudToken || '';
-        const refreshToken = settings.cloudRefreshToken || '';
-        const tokenExpireTime = settings.cloudTokenExpireTime || 0;
-        const currentUserId = settings.cloudCurrentUserId || 'admin';
-        
-        if (!appId || !appKey || !appSecret) {
-          return { success: false, message: '请先填写云同步配置' };
-        }
-        
-        cloudSync = new CloudSync();
-        cloudSync.setUserId(currentUserId);
-        await cloudSync.init({
-          appId: appId,
-          appKey: appKey,
-          appSecret: appSecret,
-          token: token,
-          refreshToken: refreshToken,
-          tokenExpireTime: tokenExpireTime,
-          onTokenUpdate: async (tokenData) => {
-            const currentData = readData();
-            currentData.settings = currentData.settings || {};
-            currentData.settings.cloudToken = tokenData.token;
-            currentData.settings.cloudRefreshToken = tokenData.refreshToken;
-            currentData.settings.cloudTokenExpireTime = tokenData.tokenExpireTime;
-            await writeData(
-              currentData.tasks,
-              currentData.memos,
-              currentData.expenses,
-              currentData.budgets,
-              currentData.settings,
-              currentData.translationStats,
-              currentData.categoryBudgets || [],
-              currentData.secrets || [],
-              currentData.journals || []
-            );
-          }
-        });
-      }
-      
       const updateMgr = getUpdateManager();
-      updateMgr.setCloudSync(cloudSync);
-      
       const currentAppPath = getCurrentAppPath();
       const sourceDir = path.join(currentAppPath, 'resources', 'app');
-      
-      const result = await updateMgr.createAndUploadManifest(sourceDir);
-      
+
+      const result = await updateMgr.pushChanges(sourceDir, '更新代码版本');
       return result;
     } catch (e) {
-      safeError('创建版本清单失败:', e);
-      return { success: false, message: '创建版本清单失败: ' + e.message };
+      safeError('代码同步失败:', e);
+      return { success: false, message: '代码同步失败: ' + e.message };
     }
   });
 

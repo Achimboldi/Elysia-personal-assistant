@@ -3484,7 +3484,7 @@ class AppController {
     if (confirmAuthCodeBtn) confirmAuthCodeBtn.addEventListener('click', () => this.exchangeAuthCode());
     
     if (appUploadBtn) appUploadBtn.addEventListener('click', () => this.uploadAppToCloud());
-    if (versionListBtn) versionListBtn.addEventListener('click', () => this.showVersionList());
+    if (versionListBtn) versionListBtn.addEventListener('click', () => this.pullFromGitHub());
     if (versionAutoIncreaseBtn) versionAutoIncreaseBtn.addEventListener('click', () => this.autoIncreaseVersion());
     
     if (autoSyncToggle) autoSyncToggle.addEventListener('change', (e) => this.toggleAutoSync(e.target.checked));
@@ -4478,6 +4478,7 @@ class AppController {
     return `${major}.${minor}.${patch}`;
   }
 
+  // ★ Git 版：代码推送到 GitHub
   async uploadAppToCloud() {
     const uploadBtn = document.getElementById('cloudAppUploadBtn');
     const progressDiv = document.getElementById('uploadProgress');
@@ -4487,119 +4488,74 @@ class AppController {
     const progressDetails = document.getElementById('uploadProgressDetails');
     const newVersionInput = document.getElementById('newVersionInput');
     const newVersionNoteInput = document.getElementById('newVersionNote');
-    
-    if (!uploadBtn || !progressDiv || !progressTitle || !progressStatus || !progressBar || !progressDetails) {
-      alert('上传界面元素未就绪，请重新打开设置页面');
+
+    if (!uploadBtn || !progressDiv || !progressBar) {
+      alert('同步界面元素未就绪，请重新打开设置页面');
       return;
     }
-    
+
     uploadBtn.disabled = true;
-    uploadBtn.textContent = '上传中...';
+    uploadBtn.textContent = '同步中...';
     progressDiv.style.display = 'block';
-    progressBar.style.width = '0%';
-    progressDetails.innerHTML = '';
-    
-    const progressHandler = (event, progress) => {
-      const current = progress.current ?? 0;
-      const total = progress.total ?? 0;
-      progressStatus.textContent = `${current}/${total}`;
-      const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
-      progressBar.style.width = `${percentage}%`;
-      
-      switch (progress.status) {
-        case 'started':
-          progressTitle.textContent = '正在准备...';
-          break;
-        case 'uploading':
-          progressTitle.textContent = `正在上传: ${progress.fileName || ''}`;
-          if (progress.fileName) {
-            // ★ 用 insertAdjacentHTML 替代 innerHTML +=，避免反复解析已有 DOM
-            progressDetails.insertAdjacentHTML('beforeend', `<div data-file-name="${progress.fileName}" style="color: #6B7280;">上传中: ${progress.fileName}</div>`);
-          }
-          break;
-        case 'completed':
-          if (progress.fileName) {
-            // ★ 用 data-file-name 定位元素并直接更新，替代 innerHTML 字符串替换
-            const el = progressDetails.querySelector(`[data-file-name="${CSS.escape(progress.fileName)}"]`);
-            if (el) {
-              el.style.color = '#10B981';
-              el.textContent = `✓ ${progress.fileName}`;
-            }
-          }
-          break;
-        case 'skipped':
-          if (progress.fileName) {
-            progressDetails.insertAdjacentHTML('beforeend', `<div style="color: #F59E0B;">↻ ${progress.fileName} (${progress.message || '文件未变化'})</div>`);
-          }
-          break;
-        case 'finished':
-          progressTitle.textContent = '上传完成';
-          break;
-      }
-    };
-    
-    ipcRenderer.on('cloud-app-upload-progress', progressHandler);
-    
+    progressBar.style.width = '30%';
+    if (progressTitle) progressTitle.textContent = '正在推送到 GitHub...';
+    if (progressStatus) progressStatus.textContent = '';
+    if (progressDetails) progressDetails.innerHTML = '';
+
     try {
       const newVersion = newVersionInput ? newVersionInput.value.trim() : '';
       const newVersionNote = newVersionNoteInput ? newVersionNoteInput.value.trim() : '';
       const result = await ipcRenderer.invoke('cloud-app-upload', newVersion, newVersionNote);
-      
+
       if (result.success) {
+        progressBar.style.width = '100%';
+        if (progressTitle) progressTitle.textContent = '同步完成';
         alert(result.message);
-        if (result.errors && result.errors.length > 0) {
-          alert('部分文件上传失败:\n' + result.errors.join('\n'));
-        }
-        
+
         if (newVersion) {
           await ipcRenderer.invoke('update-local-version', newVersion);
           const currentVersionEl = document.getElementById('currentVersion');
           if (currentVersionEl) {
             currentVersionEl.textContent = newVersion;
           }
-          try {
-            this.updateVersionStatus(newVersion, newVersion);
-          } catch (e) {
-            console.warn('更新版本状态时出错:', e);
-          }
         }
       } else {
-        alert('上传失败: ' + result.message);
+        alert('同步失败: ' + result.message);
       }
     } catch (e) {
-      alert('上传失败: ' + e.message);
+      alert('同步失败: ' + e.message);
     } finally {
-      ipcRenderer.removeListener('cloud-app-upload-progress', progressHandler);
       uploadBtn.disabled = false;
-      uploadBtn.textContent = '上传应用到云端';
+      uploadBtn.textContent = '同步到 GitHub';
       setTimeout(() => {
         progressDiv.style.display = 'none';
         progressBar.style.width = '0%';
-        progressDetails.innerHTML = '';
+        if (progressDetails) progressDetails.innerHTML = '';
       }, 3000);
     }
   }
 
-  async downloadVersionFromCloud() {
-    if (!confirm('确定要从云端更新应用吗？更新后需要重启应用。')) {
+  // ★ Git 版：从 GitHub 拉取更新
+  async pullFromGitHub() {
+    if (!confirm('确定要从 GitHub 拉取最新代码吗？\n更新后需要重启应用使更改生效。')) {
       return;
     }
-    
+
     try {
-      const result = await ipcRenderer.invoke('cloud-version-download');
-      
+      const result = await ipcRenderer.invoke('incremental-update-perform');
+
       if (result.success) {
         alert(result.message);
         if (result.needRestart) {
-          if (confirm('是否立即重启应用？')) {
+          if (confirm('代码已更新，是否立即重启应用？')) {
             await ipcRenderer.invoke('restart-app');
           }
         }
       } else {
-        alert('下载失败: ' + result.message);
+        alert('拉取失败: ' + result.message);
       }
     } catch (e) {
-      alert('下载失败: ' + e.message);
+      alert('拉取失败: ' + e.message);
     }
   }
 
@@ -4913,7 +4869,7 @@ class AppController {
       
       statusBar.style.display = 'flex';
       statusIcon.className = 'version-status-icon update-available';
-      statusText.textContent = `发现新版本 ${cloudVersion}，点击「从云端更新」进行升级`;
+      statusText.textContent = `GitHub 有新的提交，点击「从 GitHub 拉取更新」进行升级`;
     } else if (isLocalNewer) {
       cloudBadge.textContent = '';
       cloudBadge.className = 'version-badge outdated hidden';
