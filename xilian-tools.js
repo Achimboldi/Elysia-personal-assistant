@@ -298,7 +298,7 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'addJournal',
-      description: '添加、修改或更新一篇日记/日志。用户说"写日记"、"修改日志"、"更新日记"、"改一下今天的日记"、"记录日志"、"今天天气不错"时使用。同一天的日志会自动更新而非新增，所以修改已有日志也用此工具。⚠️ 必须将完整的日记正文传入 content 参数，不能只在聊天中回复文字而不调用此工具。',
+      description: '添加、修改或更新一篇日记/日志。用户说"写日记"、"修改日志"、"更新日记"、"改一下今天的日记"、"记录日志"、"今天天气不错"时使用。同一天的日志会自动更新而非新增，所以修改已有日志也用此工具。⚠️ 必须将完整的日记正文传入 content 参数，不能只在聊天中回复文字而不调用此工具。⚠️ 不要将聊天回复、角色扮演内容、群聊消息保存为日记——只有用户明确要求写日记时才使用此工具。',
       parameters: {
         type: 'object',
         properties: {
@@ -1227,6 +1227,25 @@ async function addJournal(args) {
   if (!args.content || String(args.content).trim().length === 0) {
     return { success: false, message: '日记内容不能为空，请在 content 参数中传入完整的日记正文。' };
   }
+
+  // ★ 修复：检测疑似聊天回复/角色扮演内容，防止 AI 误将聊天内容保存为日记
+  const contentStr = String(args.content);
+  const chatReplyPatterns = [
+    /按下发送键/,
+    /一条新消息弹出/,
+    /续费.*元至以下账户/,
+    /桑多涅语音包/,
+    /触发.*隐藏设定/,
+    /\*你在群里.*发送/,
+  ];
+  const looksLikeChatReply = chatReplyPatterns.some(p => p.test(contentStr));
+  if (looksLikeChatReply) {
+    return {
+      success: false,
+      message: '⚠️ 检测到内容疑似聊天回复/角色扮演，不是日记正文。请不要将聊天内容保存为日记。如果用户确实要求写日记，请传入真正的日记正文。'
+    };
+  }
+
   const userId = getCurrentUserId();
   const now = new Date().toISOString();
   const today = now.split('T')[0];
