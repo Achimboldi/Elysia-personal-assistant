@@ -262,9 +262,10 @@ class UpdateManager {
           timeout: 60000,
         });
         if (!pushResult.success) {
+          this.error(`git push 失败: ${pushResult.output}`);
           return {
             success: false,
-            message: '推送失败，请检查网络和认证。',
+            message: '推送失败：' + (pushResult.output || '请检查网络和认证。'),
           };
         }
         return {
@@ -311,10 +312,11 @@ class UpdateManager {
       timeout: 60000,
     });
     if (!pushResult.success) {
+      this.error(`git push 失败: ${pushResult.output}`);
       return {
         success: false,
         message:
-          '推送失败，请检查网络和 GitHub 认证。\n提示：可通过 GitHub Desktop 登录后重试。',
+          '推送失败：' + (pushResult.output || '请检查网络和 GitHub 认证。\n提示：首次使用请先在 GitHub Desktop 中点击 Push origin 以缓存凭据。'),
       };
     }
 
