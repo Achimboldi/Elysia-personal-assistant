@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>取色器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            cursor: crosshair;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        #colorPreview {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 120px;
+            height: 60px;
+            border: 3px solid white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Microsoft YaHei', sans-serif;
+            font-size: 14px;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+        }
+        #magnifier {
+            position: fixed;
+            width: 100px;
+            height: 100px;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            pointer-events: none;
+            display: none;
+            overflow: hidden;
+        }
+        #magnifierCanvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="colorPreview">点击选取颜色</div>
+    <div id="magnifier">
+        <canvas id="magnifierCanvas" width="100" height="100"></canvas>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        let screenImage = null;
+        let colorPreview = document.getElementById('colorPreview');
+        let magnifier = document.getElementById('magnifier');
+        let magnifierCanvas = document.getElementById('magnifierCanvas');
+        let magnifierCtx = magnifierCanvas.getContext('2d');
+
+        ipcRenderer.on('init-picker', (event, data) => {
+            screenImage = new Image();
+            screenImage.onload = () => {
+                document.body.style.backgroundImage = `url(${data.dataUrl})`;
+                document.body.style.backgroundSize = 'cover';
+                document.body.style.backgroundPosition = 'center';
+            };
+            screenImage.src = data.dataUrl;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!screenImage) return;
+
+            magnifier.style.display = 'block';
+            magnifier.style.left = (e.screenX - 50) + 'px';
+            magnifier.style.top = (e.screenY - 110) + 'px';
+
+            magnifierCtx.clearRect(0, 0, 100, 100);
+
+            const sourceX = e.clientX * (screenImage.width / window.innerWidth) - 15;
+            const sourceY = e.clientY * (screenImage.height / window.innerHeight) - 15;
+            const sourceSize = 30;
+
+            magnifierCtx.imageSmoothingEnabled = false;
+            magnifierCtx.drawImage(screenImage, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 100, 100);
+
+            const centerX = 50;
+            const centerY = 50;
+            magnifierCtx.strokeStyle = 'white';
+            magnifierCtx.lineWidth = 1;
+            magnifierCtx.beginPath();
+            magnifierCtx.moveTo(centerX - 8, centerY);
+            magnifierCtx.lineTo(centerX + 8, centerY);
+            magnifierCtx.moveTo(centerX, centerY - 8);
+            magnifierCtx.lineTo(centerX, centerY + 8);
+            magnifierCtx.stroke();
+
+            const pixel = magnifierCtx.getImageData(centerX, centerY, 1, 1).data;
+            const color = `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
+            colorPreview.style.background = color;
+            colorPreview.textContent = `${pixel[0]}, ${pixel[1]}, ${pixel[2]}`;
+        });
+
+        document.addEventListener('mouseleave', () => {
+            magnifier.style.display = 'none';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!screenImage) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = screenImage.width;
+            canvas.height = screenImage.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(screenImage, 0, 0);
+
+            const x = Math.floor(e.clientX * (screenImage.width / window.innerWidth));
+            const y = Math.floor(e.clientY * (screenImage.height / window.innerHeight));
+            const pixel = ctx.getImageData(x, y, 1, 1).data;
+
+            ipcRenderer.send('color-picked', { r: pixel[0], g: pixel[1], b: pixel[2] });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                ipcRenderer.send('color-picked', null);
+            }
+        });
+    </script>
+</body>
+</html>

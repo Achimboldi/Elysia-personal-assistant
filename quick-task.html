@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新建快速任务</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* 独立窗口样式 */
+        body {
+            background: white;
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+
+        .window-container {
+            width: 100%;
+            min-height: 100vh;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .window-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid #e0e0e0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .window-header h3 {
+            color: white;
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .window-close {
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .window-close:hover {
+            color: white;
+        }
+
+        .window-body {
+            padding: 16px 18px;
+        }
+
+        .window-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 18px;
+            border-top: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+
+        .window-footer .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .window-footer .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .window-footer .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .window-footer .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="window-container">
+        <div class="window-header">
+            <h3>快速创建任务</h3>
+            <button class="window-close" id="quickCancelBtn">&times;</button>
+        </div>
+        <div class="window-body">
+            <div class="form-group">
+                <label for="quickTitle">标题 <span class="required">*</span></label>
+                <input type="text" id="quickTitle" required placeholder="输入任务标题">
+            </div>
+            <div class="form-group">
+                <label for="quickDueDate">截止时间</label>
+                <input type="datetime-local" id="quickDueDate">
+            </div>
+        </div>
+        <div class="window-footer">
+            <button type="button" id="cancelQuickBtn" class="btn-secondary">取消</button>
+            <button type="button" id="quickSaveBtn" class="btn-primary">创建</button>
+        </div>
+    </div>
+    <script src="quick-task.js"></script>
+</body>
+</html>

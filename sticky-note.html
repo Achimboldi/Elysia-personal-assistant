@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>便利贴</title>
+    <link rel="stylesheet" href="node_modules/quill/dist/quill.snow.css">
+    <link rel="stylesheet" href="sticky-note.css">
+</head>
+<body>
+    <div class="sticky-wrapper" id="stickyWrapper">
+        <!-- ★ 目录导航抽屉（默认收起，从左侧滑入；浮层式不压缩便利贴正文） -->
+        <div class="sticky-outline-nav" id="stickyOutlineNav">
+            <div class="sticky-outline-nav-header">
+                <span>目录</span>
+                <button class="sticky-outline-close" id="stickyOutlineClose" title="收起">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="sticky-outline-nav-inner" id="stickyOutlineInner"></div>
+        </div>
+
+        <div class="sticky-container" id="stickyContainer">
+            <div class="sticky-header" id="stickyHeader">
+                <div class="sticky-controls-left">
+                    <button class="sticky-btn" id="navToggleBtn" title="目录导航">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    </button>
+                    <button class="sticky-btn" id="pinBtn" title="置顶">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                        </svg>
+                    </button>
+                    <button class="sticky-btn" id="colorBtn" title="换色">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="7" cy="7" r="3"/>
+                            <circle cx="17" cy="7" r="3"/>
+                            <circle cx="7" cy="17" r="3"/>
+                            <circle cx="17" cy="17" r="3"/>
+                        </svg>
+                    </button>
+                    <button class="sticky-btn" id="minimizeBtn" title="最小化">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                    </button>
+                    <button class="sticky-btn sticky-close" id="closeBtn" title="关闭">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="sticky-body" id="stickyBody">
+                <div class="sticky-drag-area" id="dragArea"></div>
+
+                <div class="sticky-content-controls" id="contentControls">
+                    <button class="sticky-content-btn sticky-nav-toggle" id="navToggleBtnContent" title="目录导航">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    </button>
+                    <button class="sticky-content-btn" id="expandBtn" title="展开">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 15l-6-6-6 6"/>
+                        </svg>
+                    </button>
+                    <button class="sticky-content-btn" id="colorBtnContent" title="换色">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="7" cy="7" r="3"/>
+                            <circle cx="17" cy="7" r="3"/>
+                            <circle cx="7" cy="17" r="3"/>
+                            <circle cx="17" cy="17" r="3"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="sticky-title-wrapper" id="stickyTitleWrapper">
+                    <input type="text" id="stickyTitle" class="sticky-title-input" placeholder="标题">
+                </div>
+
+                <div class="sticky-textarea-wrapper" id="stickyTextareaWrapper">
+                    <!-- 富文本查看（Quill 加载失败时的回退渲染） -->
+                    <div id="stickyContentDisplay" class="sticky-content-display"></div>
+                    <!-- 富文本编辑（与备忘录一致的 Quill 编辑器） -->
+                    <div id="stickyEditorContainer" class="sticky-quill-container">
+                        <div id="stickyQuillEditor" class="sticky-quill-editor"></div>
+                    </div>
+                    <div class="scrollbar-area" id="scrollbarArea"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="node_modules/quill/dist/quill.js"></script>
+    <script src="sticky-note.js"></script>
+</body>
+</html>

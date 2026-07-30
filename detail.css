@@ -1,0 +1,363 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    background: #f5f5f5;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 460px;
+    margin: 0 auto;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    color: #555;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.required {
+    color: #e74c3c;
+}
+
+input[type="text"],
+input[type="datetime-local"],
+textarea,
+select {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+    transition: border-color 0.3s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+textarea {
+    resize: vertical;
+}
+
+.form-row {
+    display: flex;
+    gap: 15px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+.tags-input {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+}
+
+.tags-input:focus-within {
+    border-color: #667eea;
+}
+
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tag-item {
+    background: #667eea;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.tag-item .remove-tag {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.tags-input input {
+    border: none;
+    padding: 5px;
+    flex: 1;
+    min-width: 80px;
+}
+
+.preset-tags {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+}
+
+.preset-tag {
+    background: #e0e0e0;
+    color: #555;
+    padding: 5px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.preset-tag:hover {
+    background: #667eea;
+    color: white;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #667eea;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-right: 20px;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #667eea;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+}
+
+button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+    flex: 1;
+}
+
+.btn-primary:hover {
+    background: #5568d3;
+}
+
+.btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #d0d0d0;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
+}
+
+.subtasks-section {
+    background: #fafafa;
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid #eee;
+}
+
+.subtasks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.subtasks-header label {
+    margin-bottom: 0;
+    font-weight: 600;
+}
+
+.btn-add-subtask {
+    background: #667eea;
+    color: white;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.btn-add-subtask:hover {
+    background: #5568d3;
+}
+
+.subtasks-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.no-subtasks {
+    color: #999;
+    text-align: center;
+    padding: 20px;
+    font-size: 0.9rem;
+}
+
+.subtask-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.subtask-checkbox input {
+    width: 18px;
+    height: 18px;
+    accent-color: #667eea;
+    cursor: pointer;
+}
+
+.subtask-title {
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: transparent;
+    line-height: 1.5;
+    box-sizing: border-box;
+    outline: none;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.subtask-title:empty::before {
+    content: attr(data-placeholder);
+    color: #999;
+    opacity: 0.6;
+}
+
+.subtask-title:focus {
+    outline: none;
+    background: rgba(102, 126, 234, 0.08);
+    border-color: #667eea;
+}
+
+/* 已完成/禁用态 */
+.subtask-title[contenteditable="false"] {
+    background: #f5f5f5;
+    color: #999;
+    text-decoration: line-through;
+    cursor: not-allowed;
+}
+
+/* 子任务控件行 */
+.subtask-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.subtask-date {
+    width: 140px;
+    min-width: 140px;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: white;
+    flex-shrink: 0;
+    height: 30px;
+    box-sizing: border-box;
+}
+
+.subtask-date:disabled {
+    background: #f5f5f5;
+    color: #999;
+}
+
+.subtask-priority {
+    width: 60px;
+    min-width: 60px;
+    padding: 4px 4px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background: white;
+    flex-shrink: 0;
+    height: 30px;
+    box-sizing: border-box;
+}
+
+.subtask-priority:disabled {
+    background: #f5f5f5;
+    color: #999;
+}
+
+.btn-delete-subtask {
+    background: #e74c3c;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-delete-subtask:hover {
+    background: #c0392b;
+}

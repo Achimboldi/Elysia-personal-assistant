@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任务详情</title>
+  <link rel="stylesheet" href="detail.css">
+</head>
+<body>
+  <div class="container">
+    <h1 id="pageTitle">新增任务</h1>
+    
+    <div class="form-group">
+      <label for="title">任务标题 <span class="required">*</span></label>
+      <input type="text" id="title" required placeholder="请输入任务标题">
+    </div>
+
+    <div class="form-group">
+      <label for="description">任务详情</label>
+      <textarea id="description" rows="3" placeholder="请输入任务详情"></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="startDate">开始时间 <span class="required">*</span></label>
+        <input type="date" id="startDate">
+      </div>
+
+      <div class="form-group">
+        <label for="endDate">截止时间 <span class="required">*</span></label>
+        <input type="date" id="endDate">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="priority">优先级</label>
+        <select id="priority">
+          <option value="urgent">紧急</option>
+          <option value="priority">优先</option>
+          <option value="normal" selected>普通</option>
+          <option value="secondary">次要</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="progress">进度</label>
+        <select id="progress">
+          <option value="pending" selected>待开始</option>
+          <option value="in-progress">进行中</option>
+          <option value="stalled">已停滞</option>
+          <option value="completed">已完成</option>
+        </select>
+      </div>
+    </div>
+
+    
+
+    <div class="form-group">
+      <label for="tags">标签</label>
+      <div class="tags-input" id="tagsInput">
+        <div id="tagsContainer" class="tags-container"></div>
+        <input type="text" id="tagInput" placeholder="添加标签，回车确认">
+      </div>
+      <div class="preset-tags">
+        <span class="preset-tag" data-tag="工作">工作</span>
+        <span class="preset-tag" data-tag="生活">生活</span>
+        <span class="preset-tag" data-tag="学习">学习</span>
+        <span class="preset-tag" data-tag="重要">重要</span>
+      </div>
+    </div>
+
+    <div class="form-group subtasks-section">
+      <div class="subtasks-header">
+        <label>子任务</label>
+        <button type="button" id="addSubtaskBtn" class="btn-add-subtask">+ 添加子任务</button>
+      </div>
+      <div id="subtasksContainer" class="subtasks-container">
+        <div class="no-subtasks">暂无子任务，点击上方按钮添加</div>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button type="button" id="deleteBtn" class="btn-danger" style="display:none;">删除</button>
+      <button type="button" id="cancelBtn" class="btn-secondary">取消</button>
+      <button type="button" id="saveBtn" class="btn-primary">保存</button>
+    </div>
+  </div>
+  <script src="detail.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    background: transparent;
+    overflow: hidden;
+}
+
+.reminder-container {
+    width: 320px;
+    height: 140px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.reminder-header {
+    height: 3px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.reminder-content {
+    padding: 12px 16px;
+}
+
+.reminder-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reminder-time {
+    font-size: 12px;
+    color: #6c6c6c;
+    margin-bottom: 12px;
+}
+
+.reminder-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 0 16px 12px 16px;
+}
+
+.reminder-buttons button {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.view-btn {
+    background: #667eea;
+    color: white;
+}
+
+.view-btn:hover {
+    background: #5568d3;
+}
+
+.snooze-btn {
+    background: #e8e8e8;
+    color: #333;
+}
+
+.snooze-btn:hover {
+    background: #d8d8d8;
+}

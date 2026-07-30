@@ -1,0 +1,70 @@
+{
+  "name": "Elysia",
+  "version": "2.0.9",
+  "description": "Elysia - Windows便利贴日程工具",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --dir",
+    "build:dir": "electron-builder --dir",
+    "build:portable": "electron-builder --win portable"
+  },
+  "build": {
+    "directories": {
+      "output": "xushi",
+      "buildResources": "build"
+    },
+    "appId": "com.elysia.app",
+    "productName": "Elysia",
+    "files": [
+      "**/*",
+      "!xushi/**",
+      "!dist/**"
+    ],
+    "extraResources": [
+      {
+        "from": "Elysia.ico",
+        "to": "Elysia.ico"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": ".icon-ico/icon.ico"
+    },
+    "portable": {
+      "artifactName": "Elysia-portable.exe"
+    },
+    "electronVersion": "28.3.3"
+  },
+  "dependencies": {
+    "auto-launch": "^5.0.6",
+    "axios": "^1.16.1",
+    "better-sqlite3": "^11.10.0",
+    "docx": "^8.2.0",
+    "dotenv": "^16.6.1",
+    "mammoth": "^1.6.0",
+    "quill": "^1.3.7",
+    "tiktoken": "^1.0.22",
+    "uiohook-napi": "^1.5.0",
+    "undici": "^6.27.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "rcedit": "^5.0.2",
+    "resedit": "^3.0.2",
+    "sharp": "^0.34.5"
+  }
+}

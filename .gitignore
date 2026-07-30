@@ -1,0 +1,29 @@
+# ============================================================
+#  Elysia 应用源码仓库 .gitignore
+#  仓库根 = win-unpacked/resources/app
+#  目标：只提交源码，排除隐私数据 / 依赖 / 打包产物
+# ============================================================
+
+# ── 隐私 / 运行时数据（核心！含 DeepSeek API Key、用户数据、网盘令牌）──
+data.json
+*.db
+*.sqlite
+*.sqlite3
+memory/
+.workbuddy/
+
+# ── 依赖（用 `npm install` 按 package.json 重建，不入库）──
+node_modules/
+
+# ── 系统 / 临时文件 ──
+nul
+Thumbs.db
+.DS_Store
+ehthumbs.db
+Desktop.ini
+*.log
+
+# ── 可选：锁定文件 ──
+# 开源项目通常保留 package-lock.json 以保证可重现；
+# 若你不想入库，取消下面这行注释即可。
+# package-lock.json

@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elysia</title>
+    <link rel="stylesheet" href="styles.css?v=2026072704">
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+</head>
+<body>
+    <div id="loadingScreen" class="loading-screen" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">加载中...</div>
+        </div>
+    </div>
+    <div class="header-container">
+        <div class="titlebar">
+            <div class="titlebar-left no-drag">
+                <span class="titlebar-title">Elysia Beta</span>
+                <span id="currentDateFull" class="titlebar-date-display"></span>
+                <div class="global-search-wrapper" id="globalSearchWrapper">
+                    <svg class="global-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="globalSearchInput" class="global-search-input" placeholder="搜索任务、备忘录、密钥、日志、收支..." autocomplete="off">
+                    <div id="globalSearchResults" class="global-search-results" style="display:none;"></div>
+                </div>
+            </div>
+            <div class="titlebar-right no-drag">
+                <button class="titlebar-btn" id="minimizeBtn" title="最小化">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <rect x="3" y="7" width="10" height="2" fill="currentColor"></rect>
+                    </svg>
+                </button>
+                <button class="titlebar-btn" id="maximizeBtn" title="最大化">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <rect x="3" y="3" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"></rect>
+                    </svg>
+                </button>
+                <button class="titlebar-btn titlebar-btn-close" id="closeBtn" title="关闭">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <line x1="4" y1="4" x2="12" y2="12" stroke="currentColor" stroke-width="2"></line>
+                        <line x1="12" y1="4" x2="4" y2="12" stroke="currentColor" stroke-width="2"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div id="datePickerModal" class="modal-overlay" style="display: none;">
+            <div class="date-picker-modal">
+                <div class="date-picker-header">
+                    <button class="date-picker-nav-btn" id="datePickerPrevYear">◀◀</button>
+                    <button class="date-picker-nav-btn" id="datePickerPrevMonth">◀</button>
+                    <span id="datePickerTitle"></span>
+                    <button class="date-picker-nav-btn" id="datePickerNextMonth">▶</button>
+                    <button class="date-picker-nav-btn" id="datePickerNextYear">▶▶</button>
+                </div>
+                <div class="date-picker-weekdays">
+                    <span>日</span>
+                    <span>一</span>
+                    <span>二</span>
+                    <span>三</span>
+                    <span>四</span>
+                    <span>五</span>
+                    <span>六</span>
+                </div>
+                <div class="date-picker-grid" id="datePickerGrid"></div>
+                <div class="date-picker-footer">
+                    <button class="date-picker-today-btn" id="datePickerToday">今天</button>
+                    <button class="date-picker-close-btn" id="datePickerClose">关闭</button>
+                </div>
+            </div>
+        </div>
+        <div class="main-container">
+            <div class="left-nav">
+                <div class="nav-item nav-item-xilian active" data-view="xilian">
+                    <span class="nav-text">昔涟</span>
+                </div>
+                <div class="nav-item" data-view="tasks">
+                    <span class="nav-text">任务</span>
+                </div>
+                <div class="nav-item" data-view="expenses">
+                    <span class="nav-text">收支</span>
+                </div>
+                <div class="nav-item" data-view="secrets">
+                    <span class="nav-text">密钥</span>
+                </div>
+                <div class="nav-item" data-view="journal">
+                    <span class="nav-text">日志</span>
+                </div>
+                <div class="nav-item" data-view="memory">
+                    <span class="nav-text">星图</span>
+                </div>
+                <div class="nav-item-bottom">
+                    <button class="nav-bottom-btn nav-bottom-btn-icononly" id="navSettingsBtn" title="设置">
+                        <span class="nav-btn-icon">
+                            <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+                            </svg>
+                        </span>
+                    </button>
+                    <button class="nav-bottom-btn nav-bottom-btn-icononly" id="navRefreshBtn" title="刷新">
+                        <span class="nav-btn-icon">
+                            <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 12a9 9 0 1 1-3.13-6.84"/>
+                                <polyline points="21 4 21 10 15 10"/>
+                            </svg>
+                        </span>
+                    </button>
+                    <button class="nav-bottom-btn nav-bottom-btn-icononly" id="navRestartBtn" title="重启">
+                        <span class="nav-btn-icon">
+                            <svg class="nav-svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2v3"/>
+                                <path d="M12 19v3"/>
+                                <path d="M4.93 4.93l2.12 2.12"/>
+                                <path d="M16.95 16.95l2.12 2.12"/>
+                                <path d="M2 12h3"/>
+                                <path d="M19 12h3"/>
+                                <path d="M4.93 19.07l2.12-2.12"/>
+                                <path d="M16.95 7.05l2.12-2.12"/>
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+            </div>
+            <div class="main-content">
+                <div class="panel-header">
+                    <div class="date-nav-wrapper">
+                        <button class="date-nav-btn" id="prevDayBtn"><</button>
+                        <div class="date-nav-days" id="dateNavDays">
+                        </div>
+                        <button class="date-nav-btn" id="nextDayBtn">></button>
+                        <div id="datePickerToggle" class="date-picker-toggle" onclick="window.appController.openDatePicker()">
+                            <span class="date-toggle-icon">📅</span>
+                        </div>
+                    </div>
+                    <div class="panel-header-right">
+                        <button id="addTaskBtn" class="add-task-btn panel-add-btn" title="新建任务" data-view-toggle="tasks">+</button>
+                        <button id="addSecretBtn" class="add-task-btn panel-add-btn" title="添加密钥" data-view-toggle="secrets" style="display:none;">+</button>
+                    </div>
+                </div>
+                <div class="task-content">
+                    <div class="task-content-inner">
+                        <div id="tasksView" class="view-panel">
+                            <div id="dailyTasksSection" class="daily-tasks-section" style="display:none">
+                                <div class="daily-tasks-header">
+                                    <span class="daily-tasks-title">今日任务</span>
+                                    <span class="daily-tasks-count" id="dailyTasksCount"></span>
+                                </div>
+                                <div id="dailyTasksContainerList" class="daily-tasks-list"></div>
+                                <div class="daily-task-add-row" id="dailyTaskAddRow">+ 添加今日任务</div>
+                            </div>
+                            <div class="daily-section">
+                                <div id="dailyTasksContainer" class="tasks-list"></div>
+                            </div>
+                        </div>
+                        <div id="expensesView" class="view-panel">
+                            <div class="expenses-calendar-section">
+                                <div class="calendar-header">
+                                    <button class="calendar-nav-btn" id="expenseCalendarPrevMonth">‹</button>
+                                    <span class="calendar-title" id="expenseCalendarTitle"></span>
+                                    <button class="calendar-nav-btn" id="expenseCalendarNextMonth">›</button>
+                                </div>
+                                <div class="calendar-weekdays">
+                                    <span>日</span>
+                                    <span>一</span>
+                                    <span>二</span>
+                                    <span>三</span>
+                                    <span>四</span>
+                                    <span>五</span>
+                                    <span>六</span>
+                                </div>
+                                <div class="calendar-grid" id="expenseCalendarGrid"></div>
+                            </div>
+                            <div class="expense-detail-container">
+                                <div class="expense-detail-section">
+                                    <div class="section-header">
+                                        <span class="section-title" id="expenseDetailDate">今日支出明细</span>
+                                        <button class="btn-add-expense" id="addExpenseBtn">添加</button>
+                                    </div>
+                                    <div id="dailyExpensesContainer" class="expenses-list"></div>
+                                </div>
+                                <div class="category-budget-panel">
+                                    <h3>
+                                        预算
+                                        <button id="editCategoryBudgetBtn" class="btn-add-expense">设置</button>
+                                    </h3>
+                                    <div id="categoryBudgetList" class="category-budget-list">
+                                        <div class="empty-state">
+                                            <div>暂无分类预算</div>
+                                            <div class="empty-tip">点击上方设置按钮添加</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="secretsView" class="view-panel">
+                            <div id="secretsContainer" class="secrets-list">
+                                <div class="empty-state">
+                                    <div>🔐 暂无密钥</div>
+                                    <div class="empty-tip">点击上方按钮添加您的密钥</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="journalView" class="view-panel">
+                            <div class="journal-calendar-section">
+                                <div class="calendar-header">
+                                    <button class="calendar-nav-btn" id="journalCalendarPrevMonth">‹</button>
+                                    <span class="calendar-title" id="journalCalendarTitle"></span>
+                                    <button class="calendar-nav-btn" id="journalCalendarNextMonth">›</button>
+                                </div>
+                                <div class="calendar-weekdays">
+                                    <span>日</span>
+                                    <span>一</span>
+                                    <span>二</span>
+                                    <span>三</span>
+                                    <span>四</span>
+                                    <span>五</span>
+                                    <span>六</span>
+                                </div>
+                                <div class="calendar-grid" id="journalCalendarGrid"></div>
+                            </div>
+                            <div class="journal-detail-container">
+                                <div class="journal-detail-section">
+                                    <div class="section-header">
+                                        <span class="section-title" id="journalDetailDate">今日</span>
+                                        <div class="header-actions">
+                                            <div class="weather-dropdown">
+                                                <button class="weather-dropdown-btn" id="weatherDropdownBtn">
+                                                    <span id="weatherIcon">🌤️</span>
+                                                    <span class="dropdown-arrow">▼</span>
+                                                </button>
+                                                <div class="weather-dropdown-menu" id="weatherDropdownMenu">
+                                                    <button class="weather-option" data-weather="sunny" title="晴天">☀️ 晴天</button>
+                                                    <button class="weather-option" data-weather="cloudy" title="多云">⛅ 多云</button>
+                                                    <button class="weather-option" data-weather="rainy" title="下雨">🌧️ 下雨</button>
+                                                    <button class="weather-option" data-weather="snowy" title="下雪">❄️ 下雪</button>
+                                                    <button class="weather-option" data-weather="foggy" title="雾霾">🌫️ 雾霾</button>
+                                                </div>
+                                            </div>
+                                            <button id="saveJournalBtn" class="journal-save-btn">保存</button>
+                                        </div>
+                                    </div>
+                                    <div class="journal-editor-container">
+                                        <textarea id="journalContent" class="journal-textarea" placeholder="记录今天的心情和事情..."></textarea>
+                                        <span id="journalWordCount" class="word-count">0 字</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 聊天视图 -->
+                        <div id="xilianView" class="view-panel active">
+                            <div class="xilian-container">
+                                <!-- 聊天头部（聊天室/私聊模式） -->
+                                <div class="xilian-header" id="xilianHeader">
+                                    <!-- 左侧：头像列表 -->
+                                    <div class="xilian-header-avatars" id="xilianHeaderAvatars">
+                                        <div class="xilian-header-agent">
+                                            <img id="xilianHeaderAgentAvatar" src="" class="xilian-header-avatar" alt="智能体" style="width:24px;height:24px;border-radius:50%;">
+                                        </div>
+                                        <div class="xilian-header-user-avatar-mini">
+                                            <img id="xilianHeaderUserAvatar" src="" class="xilian-header-avatar" alt="用户" style="width:24px;height:24px;border-radius:50%;">
+                                        </div>
+                                    </div>
+                                    <!-- 中间：聊天室名字 -->
+                                    <div class="xilian-header-title" id="xilianHeaderTitle">Elysia Chat</div>
+                                    <!-- 右侧操作 -->
+                                    <div class="xilian-header-actions">
+                                        <button class="xilian-header-plus-btn" id="xilianHeaderPlusBtn" title="切换聊天室/智能体">+</button>
+                                        <!-- 下拉菜单 -->
+                                        <div class="xilian-header-dropdown" id="xilianHeaderDropdown" style="display:none;">
+                                            <div class="xilian-dropdown-section">
+                                                <div class="xilian-dropdown-label">私聊模式</div>
+                                                <div class="xilian-dropdown-subitem" data-action="switch-private">返回私聊</div>
+                                            </div>
+                                            <div class="xilian-dropdown-divider"></div>
+                                            <div class="xilian-dropdown-section">
+                                                <div class="xilian-dropdown-label">聊天室</div>
+                                                <div id="xilianDropdownRooms"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- @提及选择器 -->
+                                <div class="xilian-mention-panel" id="xilianMentionPanel" style="display:none;">
+                                    <div class="xilian-mention-list" id="xilianMentionList"></div>
+                                </div>
+                                <div class="xilian-messages" id="xilianMessages">
+                                    <div class="xilian-welcome">
+                                        <div class="xilian-welcome-inner">
+                                        <div class="xilian-welcome-icon"><img src="file:///D:/BaiduSyncdisk/Elysia/背景图/昔涟.gif" class="xilian-avatar-img xilian-welcome-avatar" style="width:64px;height:64px;border-radius:50%;" alt="昔涟"></div>
+                                        <h3>你好，我是昔涟</h3>
+                                        <p>我是你的小助理~有什么需要我来做的吗</p>
+                                        <div class="xilian-suggestions">
+                                            <button class="xilian-suggestion" data-prompt="帮我创建一个明天下午的任务：开会讨论项目进度">📋 创建任务</button>
+                                            <button class="xilian-suggestion" data-prompt="我今天午餐花了35元，帮我记一笔">💰 记一笔账</button>
+                                            <button class="xilian-suggestion" data-prompt="查看我今天的待办事项">📊 查看概况</button>
+                                            <button class="xilian-suggestion" data-prompt="帮我写一篇今天的日志，今天天气不错">📝 写日志</button>
+                                        </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="xilian-input-area">
+                                    <div class="xilian-input-wrapper">
+                                        <textarea id="xilianInput" class="xilian-input" placeholder="输入消息，来个人家聊聊天吧～🎶" rows="1"></textarea>
+                                        <button id="xilianSendBtn" class="xilian-send-btn" title="发送">
+                                            <svg class="xilian-send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                            </svg>
+                                            <svg class="xilian-stop-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none;">
+                                                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="xilian-input-footer">
+                                        <span class="xilian-model-badge" id="xilianModelBadge">deepseek-v4-flash</span>
+                                        <button id="xilianClearHistoryBtn" class="xilian-clear-btn" title="清空对话">清空对话</button>
+                                    </div>
+                                </div>
+                                <div id="xilianToolStatus" class="xilian-tool-status" style="display:none;">
+                                    <div class="xilian-tool-status-dot"></div>
+                                    <span id="xilianToolStatusText">正在执行操作...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="memoryView" class="view-panel">
+                            <!-- MC fetch 拦截 shim：在模块加载前注入，把 /api 路由到 IPC -->
+                            <script>
+                            (function(){
+                                var ipcRenderer = require('electron').ipcRenderer;
+                                window.fetch = async function(url, opts){
+                                    var u = (typeof url === 'string') ? url : ((url && url.url) || '');
+                                    try {
+                                        if (u.indexOf('/api/memory/universe') >= 0)
+                                            return new Response(JSON.stringify(await ipcRenderer.invoke('mc:universe')), {status:200, headers:{'Content-Type':'application/json'}});
+                                        if (u.indexOf('/api/memory/trace/') >= 0) {
+                                            var traceId = u.split('/').pop();
+                                            return new Response(JSON.stringify(await ipcRenderer.invoke('mc:trace', {id: traceId})), {status:200, headers:{'Content-Type':'application/json'}});
+                                        }
+                                        // 未实现端点 → 优雅空返回（Stage1 星图可视化为先）
+                                        if (u.indexOf('/api/fragments') >= 0) return new Response('{"fragments":[]}', {status:200, headers:{'Content-Type':'application/json'}});
+                                        if (u.indexOf('/api/memory/core-insight') >= 0) return new Response('{"insight":""}', {status:200, headers:{'Content-Type':'application/json'}});
+                                        if (u.indexOf('/api/memory/merge-proposal') >= 0) return new Response('{"proposals":[]}', {status:200, headers:{'Content-Type':'application/json'}});
+                                        if (u.indexOf('/api/memory/delete') >= 0) return new Response('{"ok":true}', {status:200, headers:{'Content-Type':'application/json'}});
+                                        if (u.indexOf('/api/memory/unlink') >= 0) return new Response('{"ok":true}', {status:200, headers:{'Content-Type':'application/json'}});
+                                        return new Response('{}', {status:200, headers:{'Content-Type':'application/json'}});
+                                    } catch(e){ return new Response(JSON.stringify({error:e.message}), {status:500}); }
+                                };
+                                if (!localStorage.getItem('token')) localStorage.setItem('token','elysia-local');
+                                window.MEMORY_UI_CONFIG = { user:{name:'我', color:'#e8b96d'}, ai:{name:'昔涟', color:'#6d9e8b'} };
+                            })();
+                            </script>
+                            <canvas id="bg"></canvas>
+                            <canvas id="mc"></canvas>
+                            <div id="breadcrumb"></div>
+                            <div id="mcBackfillWrap">
+                                <button class="mc-backfill-btn" id="mcBackfillBtn" title="将当前聊天记录录入星图">💬 录入对话</button>
+                                <button class="mc-backfill-btn" id="mcBackfillAllBtn" title="将全部备忘录和任务录入星图（不含私密备忘录）">📋 录入资料</button>
+                            </div>
+                            <div id="topbar">
+                                <span class="tb-title">记忆宇宙</span>
+                                <nav class="galaxy-pills" id="galaxy-pills">
+                                    <button class="gpill active" data-galaxy="">全部</button>
+                                </nav>
+                                <div class="tb-sep"></div>
+                                <button class="stardust-btn" id="stardust-btn" title="星尘 · 观测日志">✦</button>
+                                <span class="tb-count" id="tb-count">— fragments</span>
+                            </div>
+                            <div id="panel">
+                                <button id="panel-close">✕</button>
+                                <div class="p-accent" id="p-accent"></div>
+                                <div class="p-cat" id="p-cat"></div>
+                                <div class="p-title" id="p-title"></div>
+                                <div class="p-body" id="p-body"></div>
+                                <div class="p-tags" id="p-tags"></div>
+                                <div id="p-meta"></div>
+                                <div class="p-date" id="p-date"></div>
+                            </div>
+                            <div id="archlog" class="collapsed">
+                                <div id="arch-header">
+                                    <div class="arch-pulse"></div>
+                                    <span class="arch-title">观星手记</span>
+                                    <span class="arch-sub">AI · 归档代理</span>
+                                    <span class="arch-chevron">▲</span>
+                                </div>
+                                <div id="arch-body"></div>
+                            </div>
+                            <div id="model-panel" class="collapsed">
+                                <div class="mp-header" id="mp-header">
+                                    <div class="mp-dot"></div>
+                                    <span class="mp-title">认知模型</span>
+                                    <span class="mp-sub">AI · 记忆模型</span>
+                                    <span class="mp-chevron">▲</span>
+                                </div>
+                                <div id="mp-body"></div>
+                            </div>
+                            <div id="model-detail">
+                                <div id="md-content"></div>
+                            </div>
+                            <div id="core-insight-panel" class="collapsed">
+                                <div class="mp-header" id="ci-header">
+                                    <div class="mp-dot" style="background:#c9a96e"></div>
+                                    <span class="mp-title">核心洞察</span>
+                                    <span class="mp-chevron">▲</span>
+                                </div>
+                                <div id="ci-body" style="display:none">
+                                    <textarea id="ci-editor" rows="4" placeholder="由你填写。写下你对自己当前状态、核心需求或最重要领悟的一句话，Clara 会把它当作理解你的锚点……"></textarea>
+                                    <div style="margin-top:6px;font-size:11px;display:flex;align-items:center;gap:8px">
+                                        <span id="ci-updated"></span>
+                                        <button id="ci-save" style="margin-left:auto">保存</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="merge-proposals" style="display:none">
+                                <div class="mq-header">
+                                    <div class="mq-dot"></div>
+                                    <span class="mq-title">AI 的疑问</span>
+                                    <span class="mq-count" id="mq-count"></span>
+                                </div>
+                                <div id="mq-body"></div>
+                            </div>
+                            <div id="tt"></div>
+                            <div id="hint">scroll to zoom · drag to pan<br>click to dive in · Esc to surface</div>
+                            <!-- 星尘透镜 -->
+                            <div id="stardust-overlay">
+                                <div id="stardust-lens">
+                                    <div id="stardust-header">
+                                        <span class="sd-title">✦ 星尘 · 观测日志</span>
+                                        <input id="sd-search" placeholder="搜索信号..." autocomplete="off">
+                                        <select id="sd-filter">
+                                            <option value="1">最近24小时</option>
+                                            <option value="3">最近3天</option>
+                                            <option value="7" selected>最近7天</option>
+                                            <option value="30">最近30天</option>
+                                        </select>
+                                        <button id="sd-close">✕</button>
+                                    </div>
+                                    <div id="stardust-body"></div>
+                                    <div id="stardust-hint">点击信号展开详情 · 点击星座名跳转星图 · 点击空白处关闭</div>
+                                </div>
+                            </div>
+                            <!-- ★ 星图空状态浮层：同步后数据库为空时引导用户处理 -->
+                            <div id="mcEmptyOverlay" style="display:none; position:absolute; left:50%; top:42%; transform:translate(-50%,-50%); padding:24px 32px; background:rgba(10,16,36,0.85); border:1px solid rgba(124,108,255,0.25); border-radius:14px; color:rgba(220,225,255,0.92); font-size:13px; text-align:center; backdrop-filter:blur(8px); max-width:420px; line-height:1.7; box-shadow:0 4px 24px rgba(0,0,0,0.4); z-index:10;">
+                                <div style="font-size:15px; font-weight:600; margin-bottom:8px; color:#cdb9ff;">✦ 星图暂无星座</div>
+                                <div id="mcEmptyHint" style="font-size:12px; color:rgba(200,210,240,0.75); margin-bottom:14px;">点击下方按钮立即处理已录入的对话与资料，<br>或点击右上角"录入对话 / 录入资料"喂入新数据</div>
+                                <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                                    <button id="mcEmptyTickBtn" style="padding:7px 16px; background:linear-gradient(135deg,#7c6cff,#5e8bff); border:none; border-radius:8px; color:white; font-size:12px; font-weight:600; cursor:pointer;">⚡ 立即处理</button>
+                                    <button id="mcEmptyDiagBtn" style="padding:7px 16px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); border-radius:8px; color:rgba(220,225,255,0.85); font-size:12px; cursor:pointer;">📊 诊断</button>
+                                </div>
+                                <div id="mcEmptyDiag" style="display:none; margin-top:12px; padding:10px 12px; background:rgba(0,0,0,0.35); border-radius:8px; font-size:11px; text-align:left; color:rgba(190,200,230,0.85); white-space:pre-wrap; font-family:'SF Mono','Consolas',monospace;"></div>
+                            </div>
+                            <link rel="stylesheet" href="memory/styles/memory.css?v=20260724">
+                            <style>
+/* ★ 关键样式内联备用（破 Electron 缓存，百分百生效） */
+#model-panel .mp-header { padding: 12px 20px !important; gap: 10px !important; justify-content: flex-start !important; }
+#model-panel .mp-title { font-size: 12px !important; }
+#model-panel .mp-sub { margin-left: 0 !important; font-size: 11px !important; }
+#model-panel .mp-chevron { margin-left: 4px !important; }
+.galaxy-pills { gap: 6px !important; }
+.gpill { padding: 5px 11px !important; font-size: 11px !important; border-radius: 20px !important; }
+.mc-backfill-btn { padding: 5px 10px !important; font-size: 11px !important; border-radius: 20px !important; }
+#panel { max-height: 78vh !important; overflow-y: auto !important; padding: 24px 26px !important; }
+.p-accent { margin-bottom: 20px !important; }
+.p-cat { margin-bottom: 12px !important; margin-top: 2px !important; }
+.p-title { font-size: 17px !important; margin-bottom: 16px !important; }
+.p-body { font-size: 13px !important; line-height: 1.9 !important; margin-bottom: 18px !important; max-height: 180px !important; }
+.p-tags { margin-bottom: 18px !important; }
+.p-tab-bar { margin: 12px 0 10px !important; }
+.p-bridges { margin: 12px 0 10px !important; }
+.p-bridges-label { margin-bottom: 10px !important; }
+.p-bridge-link { margin-bottom: 8px !important; padding: 8px 12px !important; }
+#ci-editor { background: rgba(10, 16, 36, 0.7) !important; border: 1px solid rgba(100, 120, 255, 0.2) !important; color: rgba(200, 215, 255, 0.88) !important; }
+#ci-save { background: rgba(100, 140, 255, 0.15) !important; border: 1px solid rgba(100, 140, 255, 0.3) !important; color: rgba(185, 210, 255, 0.8) !important; padding: 5px 16px !important; border-radius: 7px !important; }
+#core-insight-panel { position: absolute !important; left: 24px !important; top: 64px !important; }
+</style>
+                            <script src="memory/js/memory/mc-bundle.js?v=20260724"></script>
+                            <script>
+                            (function(){
+                                var mv = document.getElementById('memoryView');
+                                console.log('[MC-DIAG] #memoryView exists:', !!mv,
+                                            'display:', mv && getComputedStyle(mv).display,
+                                            'size:', mv && (mv.clientWidth + 'x' + mv.clientHeight),
+                                            'parent:', mv && mv.parentElement && mv.parentElement.id);
+                            })();
+                            </script>
+                            <script>
+                            (function(){
+                                // 💬 录入当前对话
+                                var btn = document.getElementById('mcBackfillBtn');
+                                if (btn) {
+                                    btn.addEventListener('click', function(){
+                                        var restore = function(){ btn.textContent = '💬 录入对话'; };
+                                        if (typeof window.mcBackfillCurrentChat === 'function') {
+                                            var ipc = require('electron').ipcRenderer;
+                                            window.mcBackfillCurrentChat().then(function(count){
+                                                btn.textContent = '✓ 已录入 ' + (count || 0) + ' 条';
+                                                try { ipc.invoke('mc:force-tick').then(function(r){ console.log('[MC-诊断] force-tick:', JSON.stringify(r)); }); } catch(_) {}
+                                                console.log('[MC-诊断] 开始轮询 MC 管线状态（每5秒一次，共60秒）。Scribe/Archivist 在主进程运行，以下通过 IPC 自动检测：');
+                                                var pollCount = 0;
+                                                var pollTimer = setInterval(function(){
+                                                    pollCount++;
+                                                    ipc.invoke('mc:debug-status').then(function(status){
+                                                        if (status.error) {
+                                                            console.log('[MC-诊断] 第' + pollCount + '轮 查询失败:', status.error);
+                                                        } else {
+                                                            console.log('[MC-诊断] 第' + pollCount + '轮 消息=' + status.totalMessages + ' 碎片=' + status.totalFragments + ' Scribe完成=' + status.scribeRuns + '次 失败=' + (status.failedRuns || 0) + '次 最后=' + (status.lastScribeRun || '无') + ' | Archivist已启动=' + (status.archivistStarted ? '是' : '否') + ' 实体档案=' + status.entityProfiles + ' 碎片-实体链接=' + status.fragmentEntities + ' 活跃星座=' + status.activeConstellations);
+                                                            if (status.failedRuns > 0 && status.lastScribeError) {
+                                                                console.warn('[MC-诊断] ⚠️ Scribe 有 ' + status.failedRuns + ' 次失败（LLM层）！最近一次: ' + JSON.stringify(status.lastScribeError));
+                                                            }
+                                                            if (status.lastScribeCrash) {
+                                                                console.warn('[MC-诊断] 🔴 Scribe 提前崩溃（未到 scribe_runs 写入阶段）！错误: ' + JSON.stringify(status.lastScribeCrash));
+                                                            }
+                                                            if (status.totalFragments > 0) {
+                                                                console.log('[MC-诊断] ✅ 碎片已生成！Archivist 正在整理（实体档案/活跃星座应逐步增长）。');
+                                                            }
+                                                        }
+                                                    }).catch(function(e){ console.log('[MC-诊断] IPC失败:', e.message); });
+                                                    if (pollCount >= 12) { clearInterval(pollTimer); console.log('[MC-诊断] 轮询结束（共12轮60秒）'); }
+                                                }, 5000);
+                                                setTimeout(restore, 3000);
+                                            }).catch(function(e){
+                                                btn.textContent = '✗ 录入失败';
+                                                setTimeout(restore, 3000);
+                                            });
+                                        } else {
+                                            btn.textContent = '✗ 未就绪';
+                                            setTimeout(restore, 3000);
+                                        }
+                                    });
+                                }
+
+                                // 📋 录入全部备忘录和任务
+                                var btnAll = document.getElementById('mcBackfillAllBtn');
+                                if (btnAll) {
+                                    var ipc = require('electron').ipcRenderer;
+                                    btnAll.addEventListener('click', function(){
+                                        var restore = function(){ btnAll.textContent = '📋 录入资料'; };
+                                        btnAll.textContent = '...';
+                                        ipc.invoke('mc:ingest-all-content').then(function(r){
+                                            if (r.ok) {
+                                                btnAll.textContent = '✓ 已录入 ' + r.total + ' 条';
+                                                try { ipc.invoke('mc:force-tick').then(function(ft){ console.log('[MC-诊断] force-tick:', JSON.stringify(ft)); }); } catch(_) {}
+                                                console.log('[MC] 资料回填完成: 备忘录=' + r.memoCount + ' 任务=' + r.taskCount + ' 总计=' + r.total);
+                                                var pollCount = 0;
+                                                var pollTimer = setInterval(function(){
+                                                    pollCount++;
+                                                    ipc.invoke('mc:debug-status').then(function(status){
+                                                        if (!status.error) {
+                                                            console.log('[MC-诊断] 第' + pollCount + '轮 消息=' + status.totalMessages + ' 碎片=' + status.totalFragments + ' 实体档案=' + status.entityProfiles);
+                                                            if (status.totalFragments > 0) { console.log('[MC-诊断] ✅ 碎片已生成！'); }
+                                                        }
+                                                    }).catch(function(){});
+                                                    if (pollCount >= 12) clearInterval(pollTimer);
+                                                }, 5000);
+                                            } else {
+                                                btnAll.textContent = '✗ ' + (r.error || '失败');
+                                            }
+                                            setTimeout(restore, 5000);
+                                        }).catch(function(e){
+                                            btnAll.textContent = '✗ 失败';
+                                            setTimeout(restore, 3000);
+                                        });
+                                    });
+                                }
+
+                                // ★ 星图空状态浮层：自动检测 + 立即处理 + 诊断
+                                (function(){
+                                    var overlay = document.getElementById('mcEmptyOverlay');
+                                    var hint = document.getElementById('mcEmptyHint');
+                                    var tickBtn = document.getElementById('mcEmptyTickBtn');
+                                    var diagBtn = document.getElementById('mcEmptyDiagBtn');
+                                    var diagBox = document.getElementById('mcEmptyDiag');
+                                    if (!overlay || !tickBtn) return;
+
+                                    function checkEmpty(){
+                                        // ★ 优先看 topbar 文本：已显式 "connection lost" 或 "0 碎片 · 0 星座" 都视为空
+                                        var tb = document.getElementById('tb-count');
+                                        var txt = tb ? tb.textContent : '';
+                                        var isLost = txt.indexOf('connection lost') >= 0;
+                                        var isZero = /0\s*碎片/.test(txt);
+                                        if (isLost || isZero) {
+                                            overlay.style.display = 'block';
+                                            if (isLost) hint.innerHTML = '星图数据库尚未就绪。点击下方按钮可立即触发一次<br>Scribe+Archivist 流水线（需先有聊天/资料被录入）。';
+                                        } else {
+                                            overlay.style.display = 'none';
+                                        }
+                                    }
+
+                                    // 初次检查 + 轮询（每 3 秒看一次顶栏）
+                                    setTimeout(checkEmpty, 1500);
+                                    setInterval(checkEmpty, 3000);
+
+                                    // ★ 立即处理（先重试 init，再 force-tick）
+                                    tickBtn.addEventListener('click', function(){
+                                        tickBtn.textContent = '...';
+                                        tickBtn.disabled = true;
+                                        var diag = document.getElementById('mcEmptyDiag');
+                                        function runTick(){
+                                            ipc.invoke('mc:force-tick').then(function(r){
+                                                console.log('[MC-Empty] force-tick:', JSON.stringify(r));
+                                                tickBtn.textContent = '✓ 已触发';
+                                                setTimeout(function(){
+                                                    tickBtn.textContent = '⚡ 立即处理';
+                                                    tickBtn.disabled = false;
+                                                    checkEmpty();
+                                                }, 2500);
+                                            }).catch(function(e){
+                                                tickBtn.textContent = '✗ ' + (e.message || '').slice(0, 30);
+                                                setTimeout(function(){
+                                                    tickBtn.textContent = '⚡ 立即处理';
+                                                    tickBtn.disabled = false;
+                                                }, 3000);
+                                            });
+                                        }
+                                        // 先尝试重试初始化
+                                        ipc.invoke('mc:retry-init').then(function(ri){
+                                            if (ri.ok) {
+                                                hint.innerHTML = '初始化成功！正在处理数据...';
+                                                runTick();
+                                            } else {
+                                                hint.innerHTML = '初始化失败: ' + (ri.err || '未知') + '<br>请打开 F12 控制台查看详细错误';
+                                                diag.style.display = 'block';
+                                                diag.textContent = '初始化失败: ' + (ri.err || '未知');
+                                                tickBtn.textContent = '⚡ 立即处理';
+                                                tickBtn.disabled = false;
+                                            }
+                                        }).catch(function(e){
+                                            hint.innerHTML = '重试失败: ' + (e.message || '') + '<br>请打开 F12 控制台查看日志';
+                                            tickBtn.textContent = '⚡ 立即处理';
+                                            tickBtn.disabled = false;
+                                        });
+                                    });
+
+                                    // 诊断
+                                    diagBtn.addEventListener('click', function(){
+                                        diagBox.style.display = 'block';
+                                        diagBox.textContent = '查询中...';
+                                        ipc.invoke('mc:debug-status').then(function(s){
+                                            // ★ 显示 init 失败细节
+                                            if (s.initFailed) {
+                                                diagBox.textContent =
+                                                    '❌ 初始化失败\n' +
+                                                    '错误: ' + (s.error || '未知') + '\n' +
+                                                    '时间: ' + (s.initErrorTime || '?') + '\n' +
+                                                    '路径: ' + (s.dbPath || '?') + '\n\n' +
+                                                    (s.help || '请打开 F12 控制台查看完整日志') + '\n\n' +
+                                                    (s.stack || '');
+                                                return;
+                                            }
+                                            if (s.error) {
+                                                diagBox.textContent = '❌ ' + s.error + '\nDB路径: ' + (s.dbPath || '?');
+                                                return;
+                                            }
+                                            diagBox.textContent =
+                                                '消息: ' + (s.totalMessages||0) + '\n' +
+                                                '碎片: ' + (s.totalFragments||0) + '\n' +
+                                                'Scribe完成: ' + (s.scribeRuns||0) + '次 / 失败: ' + (s.failedRuns||0) + '次\n' +
+                                                '实体档案: ' + (s.entityProfiles??'?') + '\n' +
+                                                '活跃星座: ' + (s.activeConstellations??'?') + '\n' +
+                                                'Archivist: ' + (s.archivistStarted ? '已启动' : '未启动');
+                                            if (s.lastScribeCrash) {
+                                                diagBox.textContent += '\n\n🔴 Scribe 崩溃: ' + JSON.stringify(s.lastScribeCrash);
+                                            }
+                                        }).catch(function(e){
+                                            diagBox.textContent = '查询失败: ' + e.message;
+                                        });
+                                    });
+                                })();
+                            })();
+                            </script>
+                        </div>
+                    </div>
+                    <div class="finance-section">
+                        <div class="statistics-panel">
+                            <div class="statistics-panel-header">
+                                <h3>财务状况</h3>
+                                <span id="budgetPeriodInfo" class="budget-period-info"></span>
+                                <button id="financeReportBtn" class="finance-report-btn" title="导出财务报告">📊</button>
+                            </div>
+                            <div class="finance-status">
+                                <div class="finance-item">
+                                    <div class="finance-label">今日建议预算</div>
+                                    <div class="finance-value" id="suggestedBudget">--</div>
+                                    <div class="finance-tip" id="suggestedBudgetTip"></div>
+                                </div>
+                                <div class="finance-item">
+                                    <div class="finance-label">当日支出</div>
+                                    <div class="finance-value expense" id="todayExpense">--</div>
+                                </div>
+                                <div class="finance-item">
+                                    <div class="finance-label">预计结余</div>
+                                    <div class="finance-value" id="predictedBalance">--</div>
+                                </div>
+                                <div class="finance-item">
+                                    <div class="finance-label">剩余天数</div>
+                                    <div class="finance-value" id="remainingDays">--</div>
+                                </div>
+                            </div>
+                            <div class="budget-progress">
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar expense-bar" id="expenseBar"></div>
+                                    <div class="progress-bar remaining-bar" id="remainingBar"></div>
+                                </div>
+                                <div class="progress-text" id="progressText">--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+        <div class="divider"></div>
+        
+        <div class="right-panel memo-panel">
+            <div class="panel-header">
+                <h2 id="memoSectionTitle"><button id="togglePrivateBtn" class="memo-toggle-btn">备忘录</button></h2>
+                <div class="memo-header-actions">
+                    <button id="newMemoBtn" class="update-btn" title="新建备忘">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="memosContainer" class="memos-container"></div>
+        </div>
+    </div>
+    </div>
+
+    <div id="expenseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加收支</h3>
+                <button class="modal-close" id="closeExpenseModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>费用详情</label>
+                    <input type="text" id="expenseDetail" placeholder="请输入费用详情">
+                </div>
+                <div class="form-group">
+                    <label>费用类型</label>
+                    <div class="tags-input" id="expenseTagsInput">
+                        <div id="expenseTagsContainer" class="tags-container"></div>
+                        <input type="text" id="expenseTagInput" placeholder="添加标签，回车确认">
+                    </div>
+                    <div class="preset-tags" id="expensePresetTags">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>金额</label>
+                    <input type="number" id="expenseAmount" placeholder="请输入金额">
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="expenseTypeRadio" value="expense" checked> 支出</label>
+                        <label><input type="radio" name="expenseTypeRadio" value="income"> 收入</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" id="saveExpenseBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加任务</h3>
+                <button class="modal-close" id="closeTaskModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>任务标题</label>
+                    <input type="text" id="taskTitle" placeholder="请输入任务标题">
+                </div>
+                <div class="form-group">
+                    <label>优先级</label>
+                    <select id="taskPriority">
+                        <option value="urgent">紧急</option>
+                        <option value="priority">优先</option>
+                        <option value="normal" selected>普通</option>
+                        <option value="secondary">次要</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>进展状态</label>
+                    <select id="taskProgress">
+                        <option value="pending" selected>待开始</option>
+                        <option value="in-progress">进行中</option>
+                        <option value="stalled">已停滞</option>
+                        <option value="completed">已完成</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>任务详情</label>
+                    <textarea id="taskDescription" rows="3" placeholder="请输入任务详情"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>开始日期</label>
+                        <input type="date" id="taskStartDate">
+                    </div>
+                    <div class="form-group">
+                        <label>截止日期</label>
+                        <input type="date" id="taskEndDate">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>标签</label>
+                    <div class="tags-input" id="taskTagsInput">
+                        <div id="taskTagsContainer" class="tags-container"></div>
+                        <input type="text" id="taskTagInput" placeholder="添加标签，回车确认">
+                    </div>
+                    <div class="preset-tags" id="taskPresetTags">
+                        <span class="preset-tag" data-tag="工作">工作</span>
+                        <span class="preset-tag" data-tag="生活">生活</span>
+                        <span class="preset-tag" data-tag="学习">学习</span>
+                        <span class="preset-tag" data-tag="重要">重要</span>
+                    </div>
+                </div>
+                <div class="form-group subtasks-section">
+                    <div class="subtasks-header">
+                        <span class="subtasks-label">子任务</span>
+                        <button type="button" id="addTaskSubtaskBtn" class="btn-add-subtask">+</button>
+                    </div>
+                    <div id="taskSubtasksContainer" class="subtasks-container">
+                        <div class="no-subtasks">暂无子任务，点击右侧+号添加</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" id="saveTaskBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 密钥编辑弹窗 -->
+    <div id="secretModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加密钥</h3>
+                <button class="modal-close" id="closeSecretModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">名称 <span class="required">*</span></label>
+                    <input type="text" id="secretName" class="form-input" placeholder="例如：GitHub账户">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">分类</label>
+                    <div class="tag-input-wrapper" id="secretCategoryWrapper">
+                        <input type="text" id="secretCategoryInput" class="form-input tag-input" placeholder="输入分类标签">
+                        <div id="secretCategoryTags" class="selected-tags"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">自定义字段</label>
+                    <div id="secretFieldsContainer" class="secret-fields-container">
+                        <div class="secret-field-row">
+                            <input type="text" class="field-label-input" placeholder="字段名称" value="用户名">
+                            <input type="text" class="field-value-input" placeholder="字段值">
+                            <button type="button" class="btn-remove-field">✕</button>
+                        </div>
+                        <div class="secret-field-row">
+                            <input type="text" class="field-label-input" placeholder="字段名称" value="密码">
+                            <input type="text" class="field-value-input" placeholder="字段值">
+                            <button type="button" class="btn-remove-field">✕</button>
+                        </div>
+                    </div>
+                    <button type="button" id="addSecretFieldBtn" class="btn-add-field">+ 添加字段</button>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">备注</label>
+                    <textarea id="secretNotes" class="form-textarea" placeholder="其他说明信息..." rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="deleteSecretBtn" style="display: none;">删除</button>
+                <button class="btn-primary" id="saveSecretBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全局菜单 -->
+    <div id="globalCardMenu" class="card-menu">
+      <div class="menu-item" data-action="edit">编辑</div>
+      <div class="menu-item" data-action="complete">完成</div>
+      <div class="menu-item" data-action="pin">置顶</div>
+      <div class="menu-item" data-action="toggle-private">设为私密</div>
+      <div class="menu-item" data-action="download-txt">下载TXT</div>
+      <div class="menu-item" data-action="download-docx">下载DOCX</div>
+      <div class="menu-item menu-item-danger" data-action="delete">删除</div>
+    </div>
+    
+    <!-- 预算设置弹窗 -->
+    <div id="budgetModal" class="modal">
+        <div class="modal-content budget-modal-content">
+            <div class="modal-header">
+                <h3>预算设置</h3>
+                <button class="modal-close" id="closeBudgetModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- 周期管理 -->
+                <div class="budget-cycle-section">
+                    <div class="section-title-row">
+                        <label>预算周期管理</label>
+                    </div>
+                    <div id="budgetCycleList" class="budget-cycle-list">
+                        <!-- 动态生成的预算周期列表 -->
+                    </div>
+                    <button id="addNewCycleBtn" class="add-new-cycle-btn">+ 创建新周期</button>
+                </div>
+                
+                <!-- 详细设置区域 -->
+                <div id="budgetDetailSection" class="budget-detail-section" style="display: none;">
+                    <div class="detail-section-header">
+                        <span class="detail-title">预算详情设置</span>
+                        <button id="cancelEditBtn" class="cancel-edit-btn">取消编辑</button>
+                    </div>
+                    
+                    <!-- 总预算设置 -->
+                    <div class="form-group">
+                        <label>开始日期</label>
+                        <input type="date" id="budgetStartDate">
+                    </div>
+                    <div class="form-group">
+                        <label>结束日期</label>
+                        <input type="date" id="budgetEndDate">
+                    </div>
+                    <div class="form-group">
+                        <label>总预算金额</label>
+                        <input type="number" id="budgetAmount" placeholder="请输入总预算金额" step="0.01">
+                    </div>
+                    
+                    <!-- 分类预算设置 -->
+                    <div class="category-budget-section">
+                        <div class="section-title-row">
+                            <label>分类预算</label>
+                            <button id="addCategoryBudgetBtn" class="add-category-btn-mini">+</button>
+                        </div>
+                        <div id="categoryBudgetItems" class="category-budget-items">
+                            <!-- 动态生成的分类预算项 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="budgetModalFooter" class="modal-footer" style="display: none;">
+                <button class="btn-secondary" id="cancelBudgetBtn">取消</button>
+                <button class="btn-primary" id="saveBudgetBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="settingsModal" class="modal settings-modal">
+        <div class="modal-content settings-content">
+            <div class="modal-header">
+                <h3>设置</h3>
+                <button class="modal-close" id="closeSettingsModal">&times;</button>
+            </div>
+            <div class="modal-body settings-body">
+                <div class="settings-sidebar">
+                    <div class="sidebar-item active" data-section="interface">
+                        <span class="sidebar-text">界面设置</span>
+                        <span class="sidebar-arrow">▼</span>
+                        <div class="sidebar-submenu active">
+                            <div class="sidebar-subitem" data-target="theme-section" data-section="interface">主题模式</div>
+                            <div class="sidebar-subitem" data-target="card-section" data-section="interface">卡片设置</div>
+                            <div class="sidebar-subitem" data-target="font-section" data-section="interface">字体设置</div>
+                            <div class="sidebar-subitem" data-target="dark-bg-section" data-section="interface">深色背景</div>
+                            <div class="sidebar-subitem" data-target="light-bg-section" data-section="interface">浅色背景</div>
+                        </div>
+                    </div>
+                    <div class="sidebar-item" data-section="finance">
+                        <span class="sidebar-text">财务数据</span>
+                        <span class="sidebar-arrow">▼</span>
+                        <div class="sidebar-submenu">
+                            <div class="sidebar-subitem" data-target="finance-summary" data-section="finance">财务概览</div>
+                            <div class="sidebar-subitem" data-target="finance-chart" data-section="finance">消费分析</div>
+                        </div>
+                    </div>
+                    <div class="sidebar-item" data-section="cloud">
+                        <span class="sidebar-text">云同步</span>
+                        <span class="sidebar-arrow">▼</span>
+                        <div class="sidebar-submenu">
+                            <div class="sidebar-subitem" data-target="cloud-config" data-section="cloud">同步设置</div>
+                            <div class="sidebar-subitem" data-target="cloud-user-management" data-section="cloud">用户管理</div>
+                            <div class="sidebar-subitem" data-target="cloud-actions" data-section="cloud">数据同步</div>
+                            <div class="sidebar-subitem" data-target="cloud-version" data-section="cloud">版本同步</div>
+                            <div class="sidebar-subitem" data-target="backup-manager" data-section="cloud">备份管理</div>
+                        </div>
+                    </div>
+                    <div class="sidebar-item" data-section="elysia">
+                        <span class="sidebar-text">Elysia</span>
+                        <span class="sidebar-arrow">▼</span>
+                        <div class="sidebar-submenu">
+                            <div class="sidebar-subitem" data-target="elysia-api-config" data-section="elysia">API 配置</div>
+                            <div class="sidebar-subitem" data-target="elysia-agent-config" data-section="elysia">智能体配置</div>
+                            <div class="sidebar-subitem" data-target="elysia-room-config" data-section="elysia">聊天室预设</div>
+                            <div class="sidebar-subitem" data-target="elysia-shared-config" data-section="elysia">共享设置</div>
+                            <div class="sidebar-subitem" data-target="elysia-user-config" data-section="elysia">用户设置</div>
+                            <div class="sidebar-subitem" data-target="elysia-security-config" data-section="elysia">安全配置</div>
+                        </div>
+                    </div>
+                    <div class="sidebar-item" data-section="explain">
+                        <span class="sidebar-text">说明</span>
+                        <span class="sidebar-arrow">▼</span>
+                        <div class="sidebar-submenu">
+                            <div class="sidebar-subitem" data-target="memo-guide-section" data-section="explain">备忘录</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-main">
+                    <div id="settingsInterface" class="settings-panel active">
+                        <h4>界面设置</h4>
+                        <div id="theme-section" class="settings-section">
+                            <h5>主题模式</h5>
+                            <div class="form-group">
+                                <div class="radio-group">
+                                    <label><input type="radio" name="themeMode" value="light" checked> 浅色模式</label>
+                                    <label><input type="radio" name="themeMode" value="dark"> 深色模式</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="card-section" class="settings-section">
+                            <h5>卡片设置</h5>
+                            <div class="form-group">
+                                <label>任务卡片透明度: <span id="taskCardOpacityValue">80%</span></label>
+                                <input type="range" id="taskCardOpacity" min="30" max="100" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>收支卡片透明度: <span id="expenseCardOpacityValue">80%</span></label>
+                                <input type="range" id="expenseCardOpacity" min="30" max="100" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>财务状况透明度: <span id="financeCardOpacityValue">80%</span></label>
+                                <input type="range" id="financeCardOpacity" min="30" max="100" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>日历透明度: <span id="calendarOpacityValue">80%</span></label>
+                                <input type="range" id="calendarOpacity" min="30" max="100" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>预算透明度: <span id="budgetOpacityValue">80%</span></label>
+                                <input type="range" id="budgetOpacity" min="30" max="100" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>密钥卡片透明度: <span id="secretCardOpacityValue">80%</span></label>
+                                <input type="range" id="secretCardOpacity" min="30" max="100" value="80">
+                            </div>
+                        </div>
+                        <div id="font-section" class="settings-section">
+                            <h5>字体设置</h5>
+                            <div class="form-group">
+                                <label>字体大小</label>
+                                <select id="fontSizeSelect">
+                                    <option value="small">小</option>
+                                    <option value="medium" selected>中</option>
+                                    <option value="large">大</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="dark-bg-section" class="settings-section">
+                            <h5>深色模式背景设置</h5>
+                            <div class="form-group">
+                                <label>选择背景图</label>
+                                <input type="file" id="darkBackgroundImageInput" accept="image/png, image/jpeg, image/jpg" style="display: none;">
+                                <button id="selectDarkBackgroundBtn" class="btn btn-primary">选择图片</button>
+                                <button id="clearDarkBackgroundBtn" class="btn btn-secondary">去除背景图</button>
+                                <span id="darkCurrentBackgroundPath" class="file-path"></span>
+                            </div>
+                            <div class="form-group">
+                                <label>背景位置（水平）: <span id="darkBackgroundPositionXValue">50%</span></label>
+                                <input type="range" id="darkBackgroundPositionX" min="-200" max="200" value="50">
+                            </div>
+                            <div class="form-group">
+                                <label>背景位置（垂直）: <span id="darkBackgroundPositionYValue">100%</span></label>
+                                <input type="range" id="darkBackgroundPositionY" min="-200" max="200" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label>背景比例: <span id="darkBackgroundSizeWidthValue">70%</span></label>
+                                <input type="range" id="darkBackgroundSizeWidth" min="-200" max="200" value="70">
+                            </div>
+                            <div class="form-group">
+                                <label>背景透明度: <span id="darkBackgroundOpacityValue">100%</span></label>
+                                <input type="range" id="darkBackgroundOpacity" min="0" max="100" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label>背景模糊: <span id="darkBackgroundBlurValue">0px</span></label>
+                                <input type="range" id="darkBackgroundBlur" min="0" max="30" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>颜色叠加:</label>
+                                <div class="color-overlay-group">
+                                    <input type="color" id="darkOverlayColor" value="000000">
+                                    <input type="range" id="darkOverlayOpacity" min="0" max="100" value="0">
+                                    <span id="darkOverlayOpacityValue">0%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>颜色反转:</label>
+                                <div class="radio-group">
+                                    <label><input type="radio" name="darkInvert" value="none"> 不反转</label>
+                                    <label><input type="radio" name="darkInvert" value="invert" checked> 颜色反转</label>
+                                    <label><input type="radio" name="darkInvert" value="grayscale"> 灰度</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="light-bg-section" class="settings-section">
+                            <h5>浅色模式背景设置</h5>
+                            <div class="form-group">
+                                <label>选择背景图</label>
+                                <input type="file" id="lightBackgroundImageInput" accept="image/png, image/jpeg, image/jpg" style="display: none;">
+                                <button id="selectLightBackgroundBtn" class="btn btn-primary">选择图片</button>
+                                <button id="clearLightBackgroundBtn" class="btn btn-secondary">去除背景图</button>
+                                <span id="lightCurrentBackgroundPath" class="file-path"></span>
+                            </div>
+                            <div class="form-group">
+                                <label>背景位置（水平）: <span id="lightBackgroundPositionXValue">50%</span></label>
+                                <input type="range" id="lightBackgroundPositionX" min="-200" max="200" value="50">
+                            </div>
+                            <div class="form-group">
+                                <label>背景位置（垂直）: <span id="lightBackgroundPositionYValue">100%</span></label>
+                                <input type="range" id="lightBackgroundPositionY" min="-200" max="200" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label>背景比例: <span id="lightBackgroundSizeWidthValue">70%</span></label>
+                                <input type="range" id="lightBackgroundSizeWidth" min="-200" max="200" value="70">
+                            </div>
+                            <div class="form-group">
+                                <label>背景透明度: <span id="lightBackgroundOpacityValue">100%</span></label>
+                                <input type="range" id="lightBackgroundOpacity" min="0" max="100" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label>背景模糊: <span id="lightBackgroundBlurValue">0px</span></label>
+                                <input type="range" id="lightBackgroundBlur" min="0" max="30" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>颜色叠加:</label>
+                                <div class="color-overlay-group">
+                                    <input type="color" id="lightOverlayColor" value="000000">
+                                    <input type="range" id="lightOverlayOpacity" min="0" max="100" value="0">
+                                    <span id="lightOverlayOpacityValue">0%</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>颜色反转:</label>
+                                <div class="radio-group">
+                                    <label><input type="radio" name="lightInvert" value="none" checked> 不反转</label>
+                                    <label><input type="radio" name="lightInvert" value="invert"> 颜色反转</label>
+                                    <label><input type="radio" name="lightInvert" value="grayscale"> 灰度</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <button id="resetBackgroundBtn" class="btn btn-secondary">恢复默认背景</button>
+                        </div>
+                    </div>
+                    <div id="settingsFinance" class="settings-panel">
+                        <h4>💰 财务数据</h4>
+                        <div id="finance-period-label" class="finance-period-label">当前周期</div>
+                        <div id="finance-summary" class="finance-summary">
+                            <div class="summary-card">
+                                <div class="summary-content">
+                                    <div class="summary-label" id="expenseLabel">支出</div>
+                                    <div class="summary-value expense" id="financeExpense">--</div>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-content">
+                                    <div class="summary-label" id="incomeLabel">收入</div>
+                                    <div class="summary-value income" id="financeIncome">--</div>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-content">
+                                    <div class="summary-label" id="balanceLabel">结余</div>
+                                    <div class="summary-value balance" id="financeBalance">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="finance-chart" class="chart-container pie-chart-container">
+                            <canvas id="categoryChart" width="180" height="180"></canvas>
+                            <div id="categoryLegend" class="chart-legend"></div>
+                        </div>
+                        <div class="chart-container">
+                            <h5>每日支出趋势</h5>
+                            <canvas id="dailyChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                    <div id="settingsCloud" class="settings-panel">
+                        <h4>☁️ 云同步</h4>
+                        <div id="cloud-config" class="settings-section">
+                            <h5>同步设置</h5>
+                            <div class="form-group">
+                                <label>APP ID</label>
+                                <input type="text" id="cloudAppId" placeholder="请输入网盘开放平台APP ID">
+                            </div>
+                            <div class="form-group">
+                                <label>App Key</label>
+                                <input type="text" id="cloudAppKey" placeholder="请输入网盘开放平台App Key">
+                            </div>
+                            <div class="form-group">
+                                <label>App Secret</label>
+                                <input type="password" id="cloudAppSecret" placeholder="请输入网盘开放平台App Secret">
+                            </div>
+                            <div class="form-group">
+                                <label>授权码</label>
+                                <input type="text" id="cloudAuthCode" placeholder="点击下方按钮获取授权码">
+                                <div class="auth-buttons">
+                                    <button id="getAuthCodeBtn" class="btn btn-secondary btn-sm">获取授权码</button>
+                                    <button id="confirmAuthCodeBtn" class="btn btn-primary btn-sm">确认授权</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="cloud-user-management" class="settings-section">
+                            <div class="section-header">
+                                <h5>用户管理</h5>
+                                <button id="importDataBtn" class="btn btn-sm btn-secondary">导入数据</button>
+                            </div>
+                            <div class="current-user-section">
+                                <div class="current-user-label">当前用户:</div>
+                                <div class="current-user-value" id="currentCloudUserId">管理员</div>
+                                <div class="current-user-path" id="currentCloudUserPath">/apps/Elysia/data.json</div>
+                            </div>
+                            <div class="user-switch-section">
+                                <label class="user-switch-label">选择用户:</label>
+                                <select id="cloudUserSelect" class="user-select">
+                                    <option value="admin">管理员 (默认路径)</option>
+                                </select>
+                                <button id="switchCloudUserBtn" class="btn btn-sm btn-primary">切换用户</button>
+                            </div>
+                            <div class="user-list-section">
+                                <div class="user-list-header">
+                                    <span class="user-list-title">用户列表</span>
+                                    <button id="addCloudUserBtn" class="btn btn-sm btn-secondary">添加用户</button>
+                                </div>
+                                <div class="user-list" id="cloudUserList">
+                                    <div class="user-item admin-user">
+                                        <div class="user-info">
+                                            <span class="user-name">管理员</span>
+                                            <span class="user-id">admin</span>
+                                        </div>
+                                        <div class="user-actions">
+                                            <span class="user-default">默认</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="addUserModal" class="modal-overlay" style="display: none;">
+                            <div class="modal-content small-modal">
+                                <div class="modal-header">
+                                    <h3>添加用户</h3>
+                                    <button class="modal-close" onclick="document.getElementById('addUserModal').style.display='none'">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group">
+                                        <label>用户ID</label>
+                                        <input type="text" id="newUserId" placeholder="如：user001">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>用户名称</label>
+                                        <input type="text" id="newUserName" placeholder="如：张三">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-secondary" onclick="document.getElementById('addUserModal').style.display='none'">取消</button>
+                                    <button class="btn btn-primary" onclick="appController.submitAddUser()">确定</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="confirmModal" class="modal-overlay" style="display: none;">
+                            <div class="modal-content small-modal">
+                                <div class="modal-header">
+                                    <h3>确认操作</h3>
+                                    <button class="modal-close" onclick="document.getElementById('confirmModal').style.display='none'">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <p id="confirmMessage"></p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-secondary" onclick="document.getElementById('confirmModal').style.display='none'">取消</button>
+                                    <button class="btn btn-primary" onclick="appController.confirmAction()">确定</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="cloud-actions" class="settings-section">
+                            <h5>数据同步</h5>
+                            <div class="cloud-status" id="cloudStatus">
+                                <span class="status-indicator offline"></span>
+                                <span class="status-text">未连接</span>
+                            </div>
+                            <div class="sync-status-info">
+                                <div class="sync-status-item">
+                                    <span class="status-label">同步状态:</span>
+                                    <span id="syncStatusText" class="status-value idle">空闲</span>
+                                </div>
+                                <div class="sync-status-item">
+                                    <span class="status-label">上次同步:</span>
+                                    <span id="lastSyncInfo" class="status-value">--</span>
+                                </div>
+                            </div>
+                            <div class="cloud-actions-buttons">
+                                <button id="cloudUploadBtn" class="btn btn-primary">上传数据到云端</button>
+                                <button id="cloudDownloadBtn" class="btn btn-secondary">从云端下载数据</button>
+                                <button id="cloudCheckBtn" class="btn btn-secondary">检查连接</button>
+                            </div>
+                            <div class="auto-sync-section">
+                                <div class="auto-sync-toggle">
+                                    <label class="toggle-label">
+                                        <input type="checkbox" id="autoSyncToggle">
+                                        <span class="toggle-text">自动同步</span>
+                                    </label>
+                                </div>
+                                <div class="auto-sync-interval">
+                                    <label class="interval-label">同步间隔:</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="autoSyncInterval" min="1" max="120" value="10" step="1">
+                                        <span id="autoSyncIntervalValue" class="slider-value">10</span>
+                                        <span class="slider-unit">分钟</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="cloud-version" class="settings-section">
+                            <h5>版本同步</h5>
+                            <div class="version-info" id="versionInfo">
+                                <div class="version-item">
+                                    <span class="version-label">当前版本:</span>
+                                    <span id="currentVersion" class="version-value"></span>
+                                    <span id="currentVersionStatus" class="version-status"></span>
+                                </div>
+                                <div class="version-compare">
+                                    <span class="version-arrow">→</span>
+                                </div>
+                                <div class="version-item">
+                                    <span class="version-label">云端版本:</span>
+                                    <span id="cloudVersion" class="version-value"></span>
+                                    <span id="cloudVersionBadge" class="version-badge"></span>
+                                </div>
+                            </div>
+                            <div class="version-status-bar" id="versionStatusBar" style="display: none;">
+                                <div class="version-status-icon"></div>
+                                <span class="version-status-text"></span>
+                            </div>
+                            <div class="version-upload-config">
+                                <div class="version-input-group">
+                                    <label class="version-input-label">新版本号:</label>
+                                    <input type="text" id="newVersionInput" class="version-input" placeholder="如: 1.0.4">
+                                    <button id="versionAutoIncreaseBtn" class="btn btn-sm btn-secondary">自动递增</button>
+                                </div>
+                                <div class="version-note-group">
+                                    <label class="version-note-label">版本备注:</label>
+                                    <textarea id="newVersionNote" class="version-note-input" placeholder="简述本次更新的内容，如：修复云同步问题、优化界面布局..."></textarea>
+                                </div>
+                            </div>
+                            <div class="version-actions-buttons">
+                                <button id="cloudAppUploadBtn" class="btn btn-primary">上传应用到云端</button>
+                                <button id="cloudVersionListBtn" class="btn btn-secondary">从云端更新</button>
+                            </div>
+                            <div class="version-list-container" id="versionListContainer" style="display: none;">
+                                <div class="version-list-header">
+                                    <h6>云端版本列表</h6>
+                                    <span class="version-list-subtitle">最多保存5个版本，支持回退</span>
+                                </div>
+                                <div class="version-list" id="versionList"></div>
+                            </div>
+                            <div class="upload-progress" id="uploadProgress" style="display: none;">
+                                <div class="progress-header">
+                                    <span id="uploadProgressTitle">正在上传...</span>
+                                    <span id="uploadProgressStatus">0/0</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="uploadProgressBar"></div>
+                                </div>
+                                <div class="progress-details" id="uploadProgressDetails"></div>
+                            </div>
+                            <div class="download-progress" id="downloadProgress" style="display: none;">
+                                <div class="progress-header">
+                                    <span id="downloadProgressTitle">正在下载...</span>
+                                    <span id="downloadProgressStatus">0/0</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="downloadProgressBar"></div>
+                                </div>
+                                <div class="progress-details" id="downloadProgressDetails"></div>
+                            </div>
+                            <div class="delete-progress" id="deleteProgress" style="display: none;">
+                                <div class="progress-header">
+                                    <span id="deleteProgressTitle">正在删除...</span>
+                                    <span id="deleteProgressStatus">0/0</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar" id="deleteProgressBar"></div>
+                                </div>
+                                <div class="progress-details" id="deleteProgressDetails"></div>
+                            </div>
+                            <div class="cloud-sync-history" id="cloudSyncHistory">
+                                <h6>同步记录</h6>
+                                <div class="history-list" id="syncHistoryList">
+                                    <p class="empty-history">暂无同步记录</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section-divider"></div>
+                    <div id="backup-manager" class="settings-section">
+                        <h5>数据备份管理</h5>
+                        <button id="refreshBackupListBtn" class="btn btn-sm btn-secondary">刷新备份列表</button>
+                        <div class="backup-list-container" id="backupListContainer">
+                            <div class="backup-list-header">
+                                <h6>本地备份列表</h6>
+                                <span class="backup-list-subtitle">自动创建，智能清理</span>
+                            </div>
+                            <div class="backup-list" id="backupList"></div>
+                            <div class="backup-empty-state" id="backupEmptyState" style="display: none;">
+                                <p>暂无备份记录</p>
+                                <p class="hint">备份会在同步时自动创建</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 🆕 昔涟 Elysia 设置面板 -->
+                    <div id="settingsElysia" class="settings-panel">
+                        <h4>Elysia 智能体设置</h4>
+                        <div id="elysia-api-config" class="settings-section">
+                            <h5>API 配置</h5>
+                            <div class="form-group">
+                                <label class="form-label">API 类型</label>
+                                <select id="aiProvider" class="form-select setting-input" style="width:100%;">
+                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="openai">OpenAI (兼容)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">API Key</label>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <input type="password" id="aiApiKey" class="setting-input" style="flex:1;" placeholder="sk-...">
+                                    <button type="button" id="toggleAiKeyBtn" class="btn btn-sm btn-secondary" title="显示/隐藏" style="flex-shrink:0;">👁</button>
+                                </div>
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary); margin-top:4px; display:block;">API Key 保存在本地，跟随云同步和用户管理</span>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Base URL</label>
+                                <input type="text" id="aiBaseUrl" class="setting-input" style="width:100%;" placeholder="https://api.deepseek.com">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">模型</label>
+                                <select id="aiModel" class="form-select setting-input" style="width:100%;">
+                                    <option value="deepseek-v4-flash">deepseek-v4-flash（推荐，非思考）</option>
+                                    <option value="deepseek-v4-pro">deepseek-v4-pro（深度推理）</option>
+                                    <option value="deepseek-chat">deepseek-chat（兼容，即将弃用）</option>
+                                    <option value="deepseek-reasoner">deepseek-reasoner（兼容，即将弃用）</option>
+                                </select>
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary); margin-top:4px; display:block;">deepseek-chat / deepseek-reasoner 将于 2026/07/24 弃用</span>
+                            </div>
+                        </div>
+                        <div id="elysia-agent-config" class="settings-section">
+                            <h5>智能体配置</h5>
+                            <!-- 预设选择 -->
+                            <div class="form-group">
+                                <label class="form-label">选择预设</label>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <select id="aiPresetSelect" class="setting-input" style="flex:1;">
+                                        <option value="">加载中...</option>
+                                    </select>
+                                    <button id="aiPresetNewBtn" class="btn btn-sm btn-secondary" title="新增预设">+</button>
+                                    <button id="aiPresetDelBtn" class="btn btn-sm btn-secondary" title="删除当前预设" style="color:#ef4444;">×</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">名字</label>
+                                <input type="text" id="aiAgentName" class="setting-input" style="width:100%;" value="昔涟" placeholder="智能体名称">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">头像</label>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <input type="text" id="aiAgentAvatar" class="setting-input" style="flex:1;" placeholder="头像文件名或点击选择图片">
+                                    <input type="file" id="aiAgentAvatarFile" accept="image/*" style="display:none;">
+                                    <button type="button" id="selectAgentAvatarBtn" class="btn btn-secondary" style="padding:4px 10px; font-size:0.8rem;">选择图片</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">系统提示词（人设）</label>
+                                <textarea id="aiSystemPrompt" class="setting-textarea" rows="4" placeholder="定义智能体的人设和行为风格..." style="width:100%;"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">温度: <span id="aiTemperatureValue">1.0</span></label>
+                                <input type="range" id="aiTemperature" min="0" max="2" step="0.1" value="1.0" style="width:100%;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+                                    流式输出（打字机效果）
+                                    <input type="checkbox" id="aiStreamEnabled" checked style="width:16px; height:16px;">
+                                </label>
+                            </div>
+                        </div>
+                        <!-- 聊天室预设 -->
+                        <div id="elysia-room-config" class="settings-section">
+                            <h5>聊天室预设</h5>
+                            <div class="form-group">
+                                <label class="form-label">预设聊天室</label>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <select id="chatRoomPresetSelect" class="setting-input" style="flex:1;">
+                                        <option value="">无聊天室</option>
+                                    </select>
+                                    <button id="chatRoomPresetNewBtn" class="btn btn-sm btn-secondary" title="新增聊天室">+</button>
+                                    <button id="chatRoomPresetDelBtn" class="btn btn-sm btn-secondary" title="删除当前聊天室" style="color:#ef4444;">×</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">聊天室名称</label>
+                                <input type="text" id="chatRoomName" class="setting-input" style="width:100%;" placeholder="未选择聊天室">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">参与智能体（最多10个）</label>
+                                <div id="chatRoomAgentList" class="chat-room-agent-list" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                                    <span style="color:var(--text-muted); font-size:12px;">请先选择或创建聊天室</span>
+                                </div>
+                                <div style="margin-top:8px;">
+                                    <select id="chatRoomAddAgentSelect" class="setting-input" style="width:100%;">
+                                        <option value="">选择要添加的智能体...</option>
+                                    </select>
+                                </div>
+                                <button id="chatRoomAddAgentBtn" class="btn btn-sm btn-secondary" style="margin-top:6px;">添加智能体</button>
+                            </div>
+                        </div>
+                        <!-- 共享设置 -->
+                        <div id="elysia-shared-config" class="settings-section">
+                            <h5>共享设置（私聊 & 聊天室通用）</h5>
+                            <div class="form-group">
+                                <label class="form-label">上下文轮数: <span id="aiContextRoundsValue">10</span></label>
+                                <input type="range" id="aiContextRounds" min="4" max="50" value="10" step="1" style="width:100%;">
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary);">影响所有聊天模式下的 AI 上下文记忆</span>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">聊天记录上限: <span id="chatHistoryLimitValue">50</span> 条</label>
+                                <input type="range" id="chatHistoryLimit" min="10" max="500" value="50" step="5" style="width:100%;">
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary);">超出上限的旧记录会自动清理，节省内存</span>
+                            </div>
+                        </div>
+                        <!-- 用户设置 -->
+                        <div id="elysia-user-config" class="settings-section">
+                            <h5>用户设置</h5>
+                            <div class="form-group">
+                                <label class="form-label">我的名字</label>
+                                <input type="text" id="aiUserName" class="setting-input" style="width:100%;" value="我" placeholder="你的名字">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">我的头像</label>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <input type="text" id="aiUserAvatar" class="setting-input" style="flex:1;" placeholder="头像文件名或点击选择图片" value="">
+                                    <input type="file" id="aiUserAvatarFile" accept="image/*" style="display:none;">
+                                    <button type="button" id="selectUserAvatarBtn" class="btn btn-secondary" style="padding:4px 10px; font-size:0.8rem;">选择图片</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="elysia-security-config" class="settings-section">
+                            <h5>安全配置</h5>
+                            <div class="form-group">
+                                <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+                                    删除操作需确认
+                                    <input type="checkbox" id="aiDeleteConfirmEnabled" checked style="width:16px; height:16px;">
+                                </label>
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary);">AI 执行删除任务/备忘录/收支前弹窗确认</span>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+                                    操作日志
+                                    <input type="checkbox" id="aiOperationLogEnabled" style="width:16px; height:16px;">
+                                </label>
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary);">记录 AI 的每次工具调用操作</span>
+                            </div>
+                            <!-- ★ P2-1: 最大工具调用轮数可配置 -->
+                            <div class="form-group">
+                                <label class="form-label">最大工具调用轮数: <span id="aiMaxToolRoundsValue">30</span></label>
+                                <input type="range" id="aiMaxToolRounds" min="5" max="100" value="30" step="1" style="width:100%;">
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary);">AI 单次对话中最多调用工具的轮数（批量操作较多时可调大）</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="settingsExplain" class="settings-panel">
+                        <h4>说明</h4>
+                        <div id="memo-guide-section" class="settings-section">
+                            <h5>备忘录 Markdown 快捷键</h5>
+                            <p class="md-guide-intro">
+                                备忘录编辑器内置了类飞书 / Notion 的 Markdown 快捷输入，<strong>无需使用工具栏</strong>。
+                                在行首输入对应符号后按 <span class="md-kbd">空格</span> 或 <span class="md-kbd">回车</span> 即可自动转换为对应格式；
+                                行内样式在输入成对的标记后按 <span class="md-kbd">空格</span> 触发。
+                            </p>
+
+                            <div class="md-guide-block">
+                                <p class="md-guide-title">标题</p>
+                                <table class="md-guide-table">
+                                    <thead><tr><th>输入（行首）</th><th>效果</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><span class="md-code"># </span></td><td>一级标题</td></tr>
+                                        <tr><td><span class="md-code">## </span></td><td>二级标题</td></tr>
+                                        <tr><td><span class="md-code">### </span></td><td>三级标题</td></tr>
+                                        <tr><td><span class="md-code">#### </span></td><td>四级标题</td></tr>
+                                        <tr><td><span class="md-code">##### </span></td><td>五级标题</td></tr>
+                                        <tr><td><span class="md-code">###### </span></td><td>六级标题</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="md-guide-block">
+                                <p class="md-guide-title">列表</p>
+                                <table class="md-guide-table">
+                                    <thead><tr><th>输入（行首）</th><th>效果</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><span class="md-code">- </span> 或 <span class="md-code">* </span> 或 <span class="md-code">+ </span></td><td>无序列表</td></tr>
+                                        <tr><td><span class="md-code">1. </span>（2. 3. 同理）</td><td>有序列表</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="md-guide-block">
+                                <p class="md-guide-title">引用 / 代码块 / 分割线</p>
+                                <table class="md-guide-table">
+                                    <thead><tr><th>输入（行首）</th><th>效果</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><span class="md-code">&gt; </span></td><td>引用块</td></tr>
+                                        <tr><td><span class="md-code">``` </span></td><td>代码块</td></tr>
+                                        <tr><td><span class="md-code">--- </span> / <span class="md-code">*** </span> / <span class="md-code">___ </span></td><td>分割线（独立一行）</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="md-guide-block">
+                                <p class="md-guide-title">行内样式（成对标记 + 空格触发）</p>
+                                <table class="md-guide-table">
+                                    <thead><tr><th>输入</th><th>效果</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><span class="md-code">**文字**</span> 或 <span class="md-code">__文字__</span></td><td><strong>粗体</strong></td></tr>
+                                        <tr><td><span class="md-code">*文字*</span> 或 <span class="md-code">_文字_</span></td><td><em>斜体</em></td></tr>
+                                        <tr><td><span class="md-code">~~文字~~</span></td><td><del>删除线</del></td></tr>
+                                        <tr><td><span class="md-code">`文字`</span></td><td>行内代码</td></tr>
+                                    </tbody>
+                                </table>
+                                <div class="md-note">提示：成对标记需紧邻文字，输入完整后按一下 <span class="md-kbd">空格</span> 即转换。例如输入 <span class="md-code">**重点** </span> 会自动变为加粗的「重点」。</div>
+                            </div>
+
+                            <div class="md-guide-block">
+                                <p class="md-guide-title">链接</p>
+                                <table class="md-guide-table">
+                                    <thead><tr><th>操作</th><th>效果</th></tr></thead>
+                                    <tbody>
+                                        <tr><td>在备忘录里粘贴一个网址</td><td>自动变成可点击链接（显示网页标题）</td></tr>
+                                        <tr><td>粘贴含网址的整段文字</td><td>其中的网址自动识别为链接</td></tr>
+                                        <tr><td>点击编辑器内的链接</td><td>调用系统默认浏览器打开该网页</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="md-guide-block">
+                                <p class="md-guide-title">表格</p>
+                                <p class="md-guide-sub">在空白行输入 <span class="md-code">=表格</span> 后按 <span class="md-kbd">回车</span>，即可生成一张默认的 <strong>3×3 表格</strong>（首行为表头「表头1 / 表头2 / 表头3」，下方两行为空数据行）。<code>=</code> 是退格键旁边的单键，无需组合，其他快捷键未占用。</p>
+                                <table class="md-guide-table">
+                                    <thead><tr><th>输入（行首）</th><th>效果</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><span class="md-code">=表格</span></td><td>生成默认 3×3 表格</td></tr>
+                                        <tr><td><span class="md-code">=【表格】</span></td><td>同样生成默认 3×3 表格</td></tr>
+                                        <tr><td><span class="md-code">| 姓名 | 年龄 | 城市 |</span></td><td>（兼容旧式）生成 3 列表格，表头为你写的文字</td></tr>
+                                    </tbody>
+                                </table>
+                                <div class="md-note">生成后鼠标移到表格上会浮现边缘控件：<br>
+                                • <span class="md-kbd">+</span>（右侧）= 在<strong>右方</strong>插入一列；<span class="md-kbd">+</span>（下方）= 在<strong>下方</strong>插入一行<br>
+                                • <span class="md-kbd">−</span>（红色，右侧）= 删除<strong>鼠标所指的那一列</strong>；<span class="md-kbd">−</span>（红色，下方）= 删除<strong>鼠标所指的那一行</strong><br>
+                                把鼠标悬停到想删的列/行上再点红色「−」即可精确删除（至少保留 1 列 / 1 行）。点击单元格即可直接编辑内容。</div>
+                            </div>
+
+                            <div class="md-guide-block">
+                                <p class="md-guide-title">格式继承</p>
+                                <div class="md-note">在带格式的行（如加粗、引用、代码块）末尾按 <span class="md-kbd">回车</span> 换行后，新行<strong>不会</strong>继承上一行格式（与飞书 / Notion 一致），可放心继续输入普通文字。</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-version">版本号：Ego</div>
+            <div id="settingsResizeHandle" class="resize-handle"></div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelSettingsBtn">取消</button>
+                <button class="btn-primary" id="saveSettingsBtn">保存设置</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="xilian-ui.js"></script>
+    <script src="xilian-settings.js"></script>
+    <script src="chat-room-manager.js"></script>
+    <script src="xilian-manager.js"></script>
+    <script src="app.js?v=2026072704"></script>
+</body>
+</html>

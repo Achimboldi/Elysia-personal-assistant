@@ -1,0 +1,685 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+}
+
+body {
+    font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+}
+
+.sticky-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.sticky-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: none;
+    box-shadow: none;
+    background: #fff9c4;
+    min-height: 100%;
+}
+
+.sticky-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: transparent;
+    cursor: move;
+    user-select: none;
+    -webkit-app-region: drag;
+    transition: all 0.3s;
+}
+
+.sticky-header.collapsed {
+    height: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.sticky-controls-left {
+    display: flex;
+    gap: 2px;
+}
+
+.sticky-btn {
+    background: none;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-app-region: no-drag;
+    color: #333;
+}
+
+.sticky-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.sticky-close:hover {
+    background: #e57373;
+    color: white;
+}
+
+.sticky-btn svg {
+    display: block;
+}
+
+.sticky-btn.pinned svg {
+    fill: currentColor;
+}
+
+.sticky-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    padding-right: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.sticky-drag-area {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 80px;
+    height: 80px;
+    -webkit-app-region: drag;
+    cursor: move;
+    z-index: 5;
+}
+
+.sticky-content-controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 2px;
+    z-index: 10;
+    background: var(--sticky-bg-color, #fff9c4);
+    padding: 0 4px;
+    border-radius: 0;
+}
+
+.sticky-content-controls.hidden {
+    display: none;
+}
+
+.sticky-content-btn {
+    background: none;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    cursor: pointer;
+    color: rgba(0, 0, 0, 0.35);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-app-region: no-drag;
+}
+
+.sticky-content-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: rgba(0, 0, 0, 0.7);
+}
+
+.sticky-content-btn svg {
+    display: block;
+}
+
+.sticky-title-wrapper {
+    padding-right: 8px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+}
+
+.sticky-title-wrapper.collapsed {
+    height: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+}
+
+.sticky-title-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    outline: none;
+    padding: 4px 0;
+}
+
+.sticky-title-input::placeholder {
+    color: rgba(51, 51, 51, 0.5);
+}
+
+.sticky-textarea-wrapper {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    padding-top: 0;
+    transition: padding-top 0.3s ease;
+}
+
+.sticky-textarea-wrapper.collapsed {
+    padding-top: 32px;
+}
+
+.sticky-textarea-wrapper.collapsed .sticky-textarea,
+.sticky-textarea-wrapper.collapsed .sticky-content-display {
+    overflow-y: auto !important;
+}
+
+.sticky-textarea-wrapper.collapsed .scrollbar-area {
+    opacity: 1 !important;
+    background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.scrollbar-area {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    cursor: default;
+    z-index: 10;
+    background: transparent;
+    user-select: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.scrollbar-area:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.scrollbar-thumb {
+    position: absolute;
+    left: 2px;
+    width: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: none;
+}
+
+.scrollbar-area:hover .scrollbar-thumb {
+    display: block;
+}
+
+.scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+
+
+.sticky-content-display {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: #333;
+    resize: none;
+    outline: none;
+    line-height: 1.6;
+    font-family: inherit;
+    overflow-y: scroll;
+    padding: 0 4px 8px 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.sticky-content-display img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 8px 0 !important;
+    border-radius: 4px !important;
+}
+
+.sticky-content-display table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin: 8px 0 !important;
+    table-layout: fixed !important;
+}
+
+.sticky-content-display th,
+.sticky-content-display td {
+    border: 1px solid rgba(0, 0, 0, 0.2) !important;
+    padding: 6px 8px !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+.sticky-content-display p {
+    margin: 4px 0 !important;
+}
+
+.sticky-content-display h1,
+.sticky-content-display h2,
+.sticky-content-display h3 {
+    margin: 10px 0 6px 0 !important;
+}
+
+.sticky-content-display ul,
+.sticky-content-display ol {
+    padding-left: 24px !important;
+    margin: 6px 0 !important;
+}
+
+.sticky-content-display blockquote {
+    border-left: 3px solid rgba(0, 0, 0, 0.2) !important;
+    padding-left: 12px !important;
+    margin: 8px 0 !important;
+    color: rgba(0, 0, 0, 0.7) !important;
+}
+
+.sticky-textarea {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: #333;
+    resize: none;
+    outline: none;
+    line-height: 1.6;
+    font-family: inherit;
+    overflow-y: scroll;
+    padding-right: 4px;
+    box-sizing: border-box;
+}
+
+.sticky-textarea::placeholder {
+    color: rgba(51, 51, 51, 0.5);
+}
+
+.sticky-textarea::-webkit-scrollbar,
+.sticky-content-display::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sticky-textarea::-webkit-scrollbar-track,
+.sticky-content-display::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sticky-textarea::-webkit-scrollbar-thumb,
+.sticky-content-display::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+.sticky-textarea-wrapper:hover .sticky-textarea::-webkit-scrollbar-thumb,
+.sticky-textarea-wrapper:hover .sticky-content-display::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.sticky-textarea,
+.sticky-content-display {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.sticky-textarea-wrapper:hover .sticky-textarea,
+.sticky-textarea-wrapper:hover .sticky-content-display {
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+}
+
+/* ===== 富文本编辑器（Quill，排版与备忘录完全一致） ===== */
+.sticky-quill-container {
+    flex: 1;
+    height: 100%;         /* ★ 关键：父容器 .sticky-textarea-wrapper 是 display:block 不是 flex，flex:1 无效；必须用 height:100% 引用父高度（与原 textarea 一致）*/
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    position: relative;
+}
+
+#stickyEditorContainer .ql-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+}
+
+/* ★ 编辑器核心：后代选择器（有空格），确保命中 Quill 创建的内部 .ql-editor 元素 */
+#stickyQuillEditor .ql-editor {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important;      /* ← 之前因选择器 bug 未生效，导致无法滚动！*/
+    overflow-x: hidden !important;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    padding-right: 12px;
+    padding-bottom: 8px;
+    color: inherit;
+}
+
+/* ── 滚动条（与便利贴原风格一致：细、透明底色、hover 出现）── */
+#stickyQuillEditor .ql-editor::-webkit-scrollbar { width: 4px; }
+#stickyQuillEditor .ql-editor::-webkit-scrollbar-track { background: transparent; }
+#stickyQuillEditor .ql-editor::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; transition: background 0.2s; }
+.sticky-textarea-wrapper:hover #stickyQuillEditor .ql-editor::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.25); }
+#stickyQuillEditor .ql-editor { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.sticky-textarea-wrapper:hover #stickyQuillEditor .ql-editor { scrollbar-color: rgba(0, 0, 0, 0.25) transparent; }
+
+/* ══════════════════════════════════════════════════════════
+   富文本排版 —— 与备忘录 .quill-editor-container .ql-editor 完全一致
+   （飞书/腾讯文档风格：紧凑、精致、整齐）
+   ══════════════════════════════════════════════════════════ */
+
+/* 基础排版（与备忘录一致：14px / 行高1.75 / 微字间距）*/
+#stickyEditorContainer .ql-editor {
+    font-size: 14px;
+    line-height: 1.75;
+    letter-spacing: 0.01em;
+}
+
+/* ★ 强制所有文本元素继承便利贴背景自适应颜色（覆盖 Quill .ql-color-* 类和内联样式） */
+#stickyEditorContainer .ql-editor p,
+#stickyEditorContainer .ql-editor h1,
+#stickyEditorContainer .ql-editor h2,
+#stickyEditorContainer .ql-editor h3,
+#stickyEditorContainer .ql-editor h4,
+#stickyEditorContainer .ql-editor h5,
+#stickyEditorContainer .ql-editor h6,
+#stickyEditorContainer .ql-editor li,
+#stickyEditorContainer .ql-editor blockquote,
+#stickyEditorContainer .ql-editor blockquote p,
+#stickyEditorContainer .ql-editor pre,
+#stickyEditorContainer .ql-editor code,
+#stickyEditorContainer .ql-editor td,
+#stickyEditorContainer .ql-editor th,
+#stickyEditorContainer .ql-editor span,
+.sticky-content-display p,
+.sticky-content-display h1,
+.sticky-content-display h2,
+.sticky-content-display h3,
+.sticky-content-display h4,
+.sticky-content-display h5,
+.sticky-content-display h6,
+.sticky-content-display li,
+.sticky-content-display blockquote,
+.sticky-content-display blockquote p,
+.sticky-content-display pre,
+.sticky-content-display code,
+.sticky-content-display td,
+.sticky-content-display th,
+.sticky-content-display span {
+    color: inherit !important;
+}
+
+#stickyEditorContainer .ql-editor > *:first-child { margin-top: 0; }
+#stickyEditorContainer .ql-editor > *:last-child { margin-bottom: 0; }
+
+/* 段落 */
+#stickyEditorContainer .ql-editor p { margin: 6px 0; }
+
+/* 标题层级（与备忘录一致） */
+#stickyEditorContainer .ql-editor h1 {
+    font-size: 1.6em; font-weight: 700; line-height: 1.4; margin: 18px 0 10px;
+}
+#stickyEditorContainer .ql-editor h2 {
+    font-size: 1.35em; font-weight: 700; line-height: 1.4; margin: 16px 0 8px;
+}
+#stickyEditorContainer .ql-editor h3 {
+    font-size: 1.15em; font-weight: 600; line-height: 1.45; margin: 14px 0 6px;
+}
+#stickyEditorContainer .ql-editor h4,
+#stickyEditorContainer .ql-editor h5,
+#stickyEditorContainer .ql-editor h6 {
+    font-weight: 600; margin: 12px 0 6px;
+}
+
+/* 列表样式（★ 与备忘录一致：自定义圆点 marker + 精确缩进） */
+#stickyEditorContainer .ql-editor ul,
+.sticky-content-display ul {
+    padding-left: 0 !important;
+    margin: 4px 0;
+}
+#stickyEditorContainer .ql-editor ol,
+.sticky-content-display ol {
+    padding-left: 1.3em !important;
+    margin: 4px 0;
+}
+
+#stickyEditorContainer .ql-editor ul > li,
+.sticky-content-display ul > li,
+#stickyEditorContainer .ql-editor ol > li,
+.sticky-content-display ol > li {
+    position: relative;
+    margin: 1px 0 !important;
+    padding-left: 0.75em !important;
+    line-height: 1.6;
+    list-style: none !important;
+}
+
+/* 自定义圆点（与备忘录一致的小圆点，颜色随背景自适应）*/
+#stickyEditorContainer .ql-editor ul > li:not(.ql-direction-rtl)::before,
+.sticky-content-display ul > li::before {
+    content: '' !important;
+    position: absolute !important;
+    left: 0.15em !important;
+    top: 0.62em !important;
+    width: 5px !important;
+    height: 5px !important;
+    margin: 0 !important;
+    background: var(--sticky-bullet-color, currentColor);
+    border-radius: 50% !important;
+    display: block !important;
+    flex-shrink: 0;
+}
+
+/* RTL 列表隐藏圆点 */
+#stickyEditorContainer .ql-editor ul > li.ql-direction-rtl::before {
+    content: none !important;
+}
+
+/* 有序列表编号 */
+#stickyEditorContainer .ql-editor ol li::before,
+.sticky-content-display ol li::before {
+    color: var(--sticky-bullet-color, currentColor);
+    font-weight: 600;
+}
+
+/* 引用（飞书风格左侧色条） */
+#stickyEditorContainer .ql-editor blockquote,
+.sticky-content-display blockquote {
+    margin: 8px 0; padding: 8px 14px;
+    border-left: 3px solid var(--sticky-accent-color, rgba(128, 128, 128, 0.6));
+    border-radius: 0 6px 6px 0;
+}
+#stickyEditorContainer .ql-editor blockquote p,
+.sticky-content-display blockquote p { margin: 2px 0; }
+
+/* 代码块 */
+#stickyEditorContainer .ql-editor pre.ql-syntax,
+#stickyEditorContainer .ql-editor pre,
+.sticky-content-display pre {
+    margin: 8px 0; padding: 12px 14px;
+    background: rgba(128, 128, 128, 0.1);
+    border-radius: 8px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 13px; line-height: 1.6; overflow-x: auto;
+}
+#stickyEditorContainer .ql-editor code,
+.sticky-content-display code {
+    background: rgba(128, 128, 128, 0.12);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.9em;
+}
+
+/* 分割线 */
+#stickyEditorContainer .ql-editor hr {
+    border: none; border-top: 1px solid rgba(128, 128, 128, 0.45); margin: 10px 0;
+}
+
+/* 图片 */
+#stickyEditorContainer .ql-editor img,
+.sticky-content-display img {
+    max-width: 100% !important; height: auto !important;
+    display: block !important; margin: 8px 0 !important; border-radius: 4px !important;
+}
+
+/* 表格 */
+#stickyEditorContainer .ql-editor table,
+.sticky-content-display table {
+    border-collapse: collapse !important; width: 100% !important; margin: 8px 0 !important;
+    table-layout: fixed !important;
+}
+#stickyEditorContainer .ql-editor th,
+#stickyEditorContainer .ql-editor td,
+.sticky-content-display th,
+.sticky-content-display td {
+    border: 1px solid rgba(128, 128, 128, 0.5) !important;
+    padding: 6px 8px !important; word-wrap: break-word !important; overflow-wrap: break-word !important;
+}
+
+/* 富文本显示 div 默认隐藏（Quill 激活时由编辑器接管） */
+.sticky-content-display { display: none; }
+
+/* 链接颜色（深色背景→浅蓝，浅色背景→标准蓝；由 JS applyColor 动态覆盖） */
+#stickyEditorContainer .ql-editor a,
+.sticky-content-display a {
+    color: rgba(180, 210, 255, 0.9) !important;
+    text-decoration: underline; text-underline-offset: 2px;
+    transition: color 0.2s ease;
+}
+#stickyEditorContainer .ql-editor a:hover,
+.sticky-content-display a:hover {
+    color: rgba(200, 225, 255, 1) !important;
+}
+
+/* ============================================================
+   便利贴目录导航抽屉（飞书式标题大纲）
+   - 默认 translateX(-100%) 收起于左侧；.nav-open 时滑入
+   - 浮层式（absolute），不压缩便利贴正文，适合小窗口
+   ============================================================ */
+.sticky-outline-nav {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 150px;
+    max-width: 82%;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    background: var(--sticky-bg-color, #fff9c4);
+    border-right: 1px solid rgba(128, 128, 128, 0.25);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.14);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow: hidden;
+    pointer-events: none;
+}
+.sticky-wrapper.nav-open .sticky-outline-nav {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.sticky-outline-nav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 8px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sticky-text-color, #333);
+    opacity: 0.65;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    flex-shrink: 0;
+}
+.sticky-outline-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 3px;
+    background: none;
+    color: var(--sticky-text-color, #333);
+    opacity: 0.7;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+}
+.sticky-outline-close:hover { background: rgba(128, 128, 128, 0.2); opacity: 1; }
+
+.sticky-outline-nav-inner {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 0;
+}
+.sticky-outline-nav-inner::-webkit-scrollbar { width: 5px; }
+.sticky-outline-nav-inner::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.35); border-radius: 3px; }
+
+.sticky-outline-item {
+    display: block;
+    padding: 4px 10px;
+    margin: 1px 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--sticky-text-color, #333);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s;
+    text-decoration: none;
+}
+.sticky-outline-item:hover { background: rgba(128, 128, 128, 0.18); }
+.sticky-outline-item.active { font-weight: 600; background: rgba(128, 128, 128, 0.15); }
+
+.sticky-outline-empty {
+    padding: 16px 10px;
+    font-size: 11px;
+    text-align: center;
+    color: var(--sticky-text-color, #333);
+    opacity: 0.55;
+    line-height: 1.7;
+}
+
+/* 折叠态顶部：目录按钮靠左，其余按钮靠右 */
+.sticky-nav-toggle { margin-right: auto; }
