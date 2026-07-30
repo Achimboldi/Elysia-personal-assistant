@@ -1935,27 +1935,14 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('update-local-version', async (event, newVersion) => {
-    try {
-      const packageJsonPath = path.join(__dirname, 'package.json');
-      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-      packageJson.version = newVersion;
-      fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-      return { success: true, message: '版本号已更新' };
-    } catch (e) {
-      safeError('更新本地版本号失败:', e);
-      return { success: false, message: '更新版本号失败: ' + e.message };
-    }
-  });
-
-  // ★ Git 版：代码推送到 GitHub
-  ipcMain.handle('cloud-app-upload', async (event, newVersion, newVersionNote) => {
+  // ★ Git 版：代码推送到 GitHub（含仓库元数据: 简介/主页/README）
+  ipcMain.handle('cloud-app-upload', async (event, newVersion, newVersionNote, description, homepage, readmeContent, githubToken) => {
     try {
       const updateMgr = getUpdateManager();
       const currentAppPath = getCurrentAppPath();
       const sourceDir = path.join(currentAppPath, 'resources', 'app');
 
-      // 如果指定了新版本号，更新 package.json
+      // ── 1. 版本号 & package.json ──
       if (newVersion && newVersion.trim()) {
         const packageJsonPath = path.join(sourceDir, 'package.json');
         if (fs.existsSync(packageJsonPath)) {
@@ -1966,11 +1953,93 @@ function setupIpcHandlers() {
         }
       }
 
+      // ── 2. README 内容更新 ──
+      let readmeUpdated = false;
+      if (readmeContent !== undefined && readmeContent !== null) {
+        const readmePath = path.join(sourceDir, 'README.md');
+        const existingContent = fs.existsSync(readmePath)
+          ? fs.readFileSync(readmePath, 'utf-8')
+          : '';
+        if (readmeContent !== existingContent) {
+          fs.writeFileSync(readmePath, readmeContent, 'utf-8');
+          readmeUpdated = true;
+        }
+      }
+
+      // ── 3. 提交与推送 ──
       const commitMsg = newVersionNote
         ? `v${newVersion || ''}: ${newVersionNote}`
         : `v${newVersion || getCurrentVersion()} - 版本同步`;
 
       const result = await updateMgr.pushChanges(sourceDir, commitMsg);
+
+      // ── 4. GitHub API 元数据 PATCH（简介 / 主页）──
+      let metaResult = { updated: false, message: '' };
+      const token = githubToken || '';
+      const hasDesc = description && description.trim();
+      const hasHome = homepage && homepage.trim();
+      if (result.success && token && (hasDesc || hasHome)) {
+        try {
+          const owner = 'Achimboldi';
+          const repo = 'Elysia-personal-assistant';
+          const patchBody = {};
+          if (hasDesc) patchBody.description = description;
+          if (hasHome) patchBody.homepage = homepage;
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+          const apiResp = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(patchBody),
+              signal: controller.signal,
+            }
+          );
+          clearTimeout(timeoutId);
+
+          if (apiResp.ok) {
+            metaResult = {
+              updated: true,
+              message: '仓库简介/主页已更新。',
+            };
+          } else if (apiResp.status === 401 || apiResp.status === 403) {
+            metaResult = {
+              updated: false,
+              message: '⚠️ GitHub Token 认证失败（401/403），请检查 Token 是否有效且具有 repo 权限。代码已成功推送。',
+            };
+          } else {
+            const errText = await apiResp.text().catch(() => '');
+            metaResult = {
+              updated: false,
+              message: `⚠️ 仓库元数据更新失败 (${apiResp.status}): ${errText.slice(0, 200)}。代码已成功推送。`,
+            };
+          }
+        } catch (fetchErr) {
+          if (fetchErr.name === 'AbortError') {
+            metaResult = { updated: false, message: '⚠️ GitHub API 请求超时（15秒），元数据未更新。代码已成功推送。' };
+          } else {
+            metaResult = { updated: false, message: `⚠️ GitHub API 网络错误: ${fetchErr.message}。代码已成功推送。` };
+          }
+        }
+      } else if (result.success && !token && (description || homepage)) {
+        metaResult = {
+          updated: false,
+          message: '⚠️ 未配置 GitHub Token，跳过仓库元数据更新。代码已成功推送。',
+        };
+      }
+
+      // 将元数据更新结果附加到返回消息
+      if (result.success && metaResult.message) {
+        result.message = result.message + '\n' + metaResult.message;
+      }
+      result.metaUpdated = metaResult.updated;
 
       return result;
     } catch (e) {
@@ -4509,7 +4578,9 @@ ipcMain.handle('cloud-sync-check', async () => {
       aiAgentAvatar: data.settings.aiAgentAvatar,
       // 预设管理
       aiPresets: data.settings.aiPresets,
-      aiCurrentPresetId: data.settings.aiCurrentPresetId
+      aiCurrentPresetId: data.settings.aiCurrentPresetId,
+      // GitHub 版本同步配置
+      githubToken: data.settings.githubToken
     };
     
     const mergedSettings = { ...preservedSettings, ...newSettings };
@@ -4524,6 +4595,28 @@ ipcMain.handle('cloud-sync-check', async () => {
     }
     
     return { success: writeResult.success, message: writeResult.message };
+  });
+
+  // ★ GitHub 版本同步：读取仓库文件（README.md / LICENSE）
+  ipcMain.handle('read-app-file', async (event, relativePath) => {
+    try {
+      const currentAppPath = getCurrentAppPath();
+      const sourceDir = path.join(currentAppPath, 'resources', 'app');
+      const filePath = path.join(sourceDir, relativePath);
+      // 安全检查：禁止读取 ../ 越权
+      const resolved = path.resolve(filePath);
+      if (!resolved.startsWith(path.resolve(sourceDir))) {
+        return { success: false, content: '', message: '路径越权。' };
+      }
+      if (!fs.existsSync(resolved)) {
+        return { success: false, content: '', message: '文件不存在。' };
+      }
+      const content = fs.readFileSync(resolved, 'utf-8');
+      return { success: true, content, message: 'OK' };
+    } catch (e) {
+      safeError('读取应用文件失败:', e);
+      return { success: false, content: '', message: e.message };
+    }
   });
 
   // 处理颜色选择

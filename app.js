@@ -3375,6 +3375,11 @@ class AppController {
         if (section) {
           this.settingsManager.switchSettingsPanel(section);
         }
+
+        // 🆕 加载 GitHub 字段（Token + README）
+        if (targetId === 'cloud-version') {
+          this.loadGitHubFields();
+        }
         
         setTimeout(() => {
           const targetElement = document.getElementById(targetId);
@@ -3472,7 +3477,6 @@ class AppController {
     
     const appUploadBtn = document.getElementById('cloudAppUploadBtn');
     const versionListBtn = document.getElementById('cloudVersionListBtn');
-    const versionAutoIncreaseBtn = document.getElementById('versionAutoIncreaseBtn');
     
     const autoSyncToggle = document.getElementById('autoSyncToggle');
     const autoSyncInterval = document.getElementById('autoSyncInterval');
@@ -3485,7 +3489,16 @@ class AppController {
     
     if (appUploadBtn) appUploadBtn.addEventListener('click', () => this.uploadAppToCloud());
     if (versionListBtn) versionListBtn.addEventListener('click', () => this.pullFromGitHub());
-    if (versionAutoIncreaseBtn) versionAutoIncreaseBtn.addEventListener('click', () => this.autoIncreaseVersion());
+
+    // 🆕 GitHub Token 按钮
+    const githubTokenToggleBtn = document.getElementById('githubTokenToggleBtn');
+    const githubTokenSaveBtn = document.getElementById('githubTokenSaveBtn');
+    if (githubTokenToggleBtn) {
+      githubTokenToggleBtn.addEventListener('click', () => this.toggleGitHubTokenVisibility());
+    }
+    if (githubTokenSaveBtn) {
+      githubTokenSaveBtn.addEventListener('click', () => this.saveGitHubToken());
+    }
     
     if (autoSyncToggle) autoSyncToggle.addEventListener('change', (e) => this.toggleAutoSync(e.target.checked));
     if (autoSyncInterval) autoSyncInterval.addEventListener('input', (e) => this.onAutoSyncIntervalChange(e.target.value));
@@ -4477,40 +4490,62 @@ class AppController {
     statusText.textContent = message;
   }
 
-  autoIncreaseVersion() {
-    const currentVersion = document.getElementById('currentVersion').textContent;
-    const newVersion = this.incrementVersion(currentVersion);
-    document.getElementById('newVersionInput').value = newVersion;
+  // 🆕 GitHub Token 显示/隐藏切换
+  toggleGitHubTokenVisibility() {
+    const input = document.getElementById('githubTokenInput');
+    if (!input) return;
+    input.type = (input.type === 'password') ? 'text' : 'password';
   }
 
-  incrementVersion(version) {
-    if (!version || version === '未知') {
-      return '1.0.0';
+  // 🆕 保存 GitHub Token 到本地设置
+  async saveGitHubToken() {
+    const input = document.getElementById('githubTokenInput');
+    if (!input) return;
+    const token = input.value.trim();
+    try {
+      await ipcRenderer.invoke('save-settings', { githubToken: token });
+      // 短暂提示
+      const saveBtn = document.getElementById('githubTokenSaveBtn');
+      if (saveBtn) {
+        const orig = saveBtn.textContent;
+        saveBtn.textContent = '已保存';
+        saveBtn.disabled = true;
+        setTimeout(() => { saveBtn.textContent = orig; saveBtn.disabled = false; }, 1500);
+      }
+    } catch (e) {
+      console.error('保存 GitHub Token 失败:', e);
+      alert('保存失败: ' + e.message);
     }
-    
-    const parts = version.split('.');
-    if (parts.length !== 3) {
-      return '1.0.0';
-    }
-    
-    let major = parseInt(parts[0]) || 0;
-    let minor = parseInt(parts[1]) || 0;
-    let patch = parseInt(parts[2]) || 0;
-    
-    patch++;
-    if (patch >= 10) {
-      patch = 0;
-      minor++;
-    }
-    if (minor >= 10) {
-      minor = 0;
-      major++;
-    }
-    
-    return `${major}.${minor}.${patch}`;
   }
 
-  // ★ Git 版：代码推送到 GitHub
+  // 🆕 加载 GitHub 相关字段：Token + README 内容
+  async loadGitHubFields() {
+    // 加载 Token
+    try {
+      const settings = await ipcRenderer.invoke('get-settings');
+      const tokenInput = document.getElementById('githubTokenInput');
+      if (tokenInput && settings.githubToken) {
+        tokenInput.value = settings.githubToken;
+      }
+    } catch (e) {
+      console.error('加载 GitHub Token 失败:', e);
+    }
+
+    // 加载 README 内容
+    try {
+      const readmeResult = await ipcRenderer.invoke('read-app-file', 'README.md');
+      const textarea = document.getElementById('githubReadmeContent');
+      if (textarea && readmeResult.success) {
+        textarea.value = readmeResult.content;
+      } else if (textarea && !readmeResult.success) {
+        textarea.value = '// README.md 读取失败: ' + (readmeResult.message || '');
+      }
+    } catch (e) {
+      console.error('加载 README 失败:', e);
+    }
+  }
+
+  // ★ Git 版：代码推送到 GitHub（含仓库元数据: 简介/主页/README）
   async uploadAppToCloud() {
     const uploadBtn = document.getElementById('cloudAppUploadBtn');
     const progressDiv = document.getElementById('uploadProgress');
@@ -4518,8 +4553,10 @@ class AppController {
     const progressStatus = document.getElementById('uploadProgressStatus');
     const progressBar = document.getElementById('uploadProgressBar');
     const progressDetails = document.getElementById('uploadProgressDetails');
-    const newVersionInput = document.getElementById('newVersionInput');
-    const newVersionNoteInput = document.getElementById('newVersionNote');
+    const descriptionInput = document.getElementById('githubDescription');
+    const websiteInput = document.getElementById('githubWebsite');
+    const readmeTextarea = document.getElementById('githubReadmeContent');
+    const tokenInput = document.getElementById('githubTokenInput');
 
     if (!uploadBtn || !progressDiv || !progressBar) {
       alert('同步界面元素未就绪，请重新打开设置页面');
@@ -4535,22 +4572,27 @@ class AppController {
     if (progressDetails) progressDetails.innerHTML = '';
 
     try {
-      const newVersion = newVersionInput ? newVersionInput.value.trim() : '';
-      const newVersionNote = newVersionNoteInput ? newVersionNoteInput.value.trim() : '';
-      const result = await ipcRenderer.invoke('cloud-app-upload', newVersion, newVersionNote);
+      const description = descriptionInput ? descriptionInput.value : '';
+      const homepage = websiteInput ? websiteInput.value : '';
+      const readmeContent = readmeTextarea ? readmeTextarea.value : undefined;
+      const githubToken = tokenInput ? tokenInput.value.trim() : '';
+
+      // 每次同步时也保存 Token（免去单独点保存按钮）
+      if (githubToken) {
+        try {
+          await ipcRenderer.invoke('save-settings', { githubToken });
+        } catch (_) { /* 静默忽略 */ }
+      }
+
+      const result = await ipcRenderer.invoke(
+        'cloud-app-upload',
+        '', '', description, homepage, readmeContent, githubToken
+      );
 
       if (result.success) {
         progressBar.style.width = '100%';
         if (progressTitle) progressTitle.textContent = '同步完成';
         alert(result.message);
-
-        if (newVersion) {
-          await ipcRenderer.invoke('update-local-version', newVersion);
-          const currentVersionEl = document.getElementById('currentVersion');
-          if (currentVersionEl) {
-            currentVersionEl.textContent = newVersion;
-          }
-        }
       } else {
         alert('同步失败: ' + result.message);
       }

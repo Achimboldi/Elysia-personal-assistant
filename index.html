@@ -1352,14 +1352,34 @@
                                 <span class="version-status-text"></span>
                             </div>
                             <div class="version-upload-config">
-                                <div class="version-input-group">
-                                    <label class="version-input-label">新版本号:</label>
-                                    <input type="text" id="newVersionInput" class="version-input" placeholder="如: 1.0.4">
-                                    <button id="versionAutoIncreaseBtn" class="btn btn-sm btn-secondary">自动递增</button>
-                                </div>
-                                <div class="version-note-group">
-                                    <label class="version-note-label">版本备注:</label>
-                                    <textarea id="newVersionNote" class="version-note-input" placeholder="简述本次更新的内容，如：修复云同步问题、优化界面布局..."></textarea>
+                                <!-- GitHub 仓库元数据 -->
+                                <div style="padding-top:4px;">
+                                    <h6 style="margin:0 0 12px 0; color:var(--text-secondary); font-size:13px;">GitHub 仓库信息</h6>
+                                    
+                                    <div class="form-group" style="margin-bottom:12px;">
+                                        <label class="form-label" style="font-size:12px;">GitHub Token</label>
+                                        <div style="display:flex; gap:6px; align-items:center;">
+                                            <input type="password" id="githubTokenInput" class="setting-input" style="flex:1;" placeholder="ghp_... (需 repo 权限)">
+                                            <button type="button" id="githubTokenToggleBtn" class="btn btn-sm btn-secondary" title="显示/隐藏" style="flex-shrink:0;">👁</button>
+                                            <button type="button" id="githubTokenSaveBtn" class="btn btn-sm btn-primary" style="flex-shrink:0;">保存</button>
+                                        </div>
+                                        <span style="font-size:10px; color:var(--text-secondary); margin-top:3px; display:block;">在 github.com/settings/tokens 创建，勾选 repo 权限。Token 保存在本地，不会上传到仓库。</span>
+                                    </div>
+
+                                    <div class="form-group" style="margin-bottom:12px;">
+                                        <label class="form-label" style="font-size:12px;">仓库简介 (Description)</label>
+                                        <textarea id="githubDescription" class="setting-input" style="width:100%; min-height:50px; resize:vertical;" placeholder="简短描述你的仓库..."></textarea>
+                                    </div>
+
+                                    <div class="form-group" style="margin-bottom:12px;">
+                                        <label class="form-label" style="font-size:12px;">主页网址 (Website)</label>
+                                        <input type="text" id="githubWebsite" class="setting-input" style="width:100%;" placeholder="https://...">
+                                    </div>
+
+                                    <div class="form-group" style="margin-bottom:12px;">
+                                        <label class="form-label" style="font-size:12px;">README 内容</label>
+                                        <textarea id="githubReadmeContent" class="setting-input" style="width:100%; min-height:200px; resize:vertical; font-family:'Consolas','Courier New',monospace; font-size:11px;" placeholder="编辑 README.md，同步时将自动推送..."></textarea>
+                                    </div>
                                 </div>
                             </div>
                             <div class="version-actions-buttons">
@@ -1698,6 +1718,6 @@
     <script src="xilian-settings.js"></script>
     <script src="chat-room-manager.js"></script>
     <script src="xilian-manager.js"></script>
-    <script src="app.js?v=2026073002"></script>
+    <script src="app.js?v=2026073004"></script>
 </body>
 </html>
