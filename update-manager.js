@@ -234,6 +234,60 @@ class UpdateManager {
 
     this.log('正在推送本地更改到 GitHub...');
 
+    // ★ 先 fetch 远程，再判断是否需要 pull --rebase
+    const branchResult0 = this._git('rev-parse --abbrev-ref HEAD', { cwd: dir });
+    const branch = branchResult0.success ? branchResult0.output : 'main';
+
+    const fetchResult = this._git('fetch origin', { cwd: dir, timeout: 60000 });
+    if (!fetchResult.success) {
+      this.error(`git fetch 失败: ${fetchResult.output}`);
+      // 网络问题：仍然尝试推送（push 不需要 fetch）
+      // 但 push 失败的话会报告，这里不阻断
+    } else {
+      // 检查远程是否领先本地
+      const aheadRemote = this._git(
+        `rev-list --count HEAD..origin/${branch}`,
+        { cwd: dir }
+      );
+      const remoteAhead = aheadRemote.success
+        ? parseInt(aheadRemote.output) || 0
+        : 0;
+
+      if (remoteAhead > 0) {
+        this.log(`远程有 ${remoteAhead} 个新提交，执行 pull --rebase ...`);
+        // --autostash 会自动暂存未提交的本地修改，rebase 后恢复
+        const pullResult = this._git(
+          `pull --rebase --autostash origin ${branch}`,
+          { cwd: dir, timeout: 60000 }
+        );
+        if (!pullResult.success) {
+          // 可能是冲突
+          if (pullResult.output.includes('CONFLICT') || pullResult.output.includes('cannot rebase')) {
+            return {
+              success: false,
+              message:
+                '⚠️ 远程有 ' + remoteAhead + ' 个新提交，但 rebase 时出现冲突。\n' +
+                '请手动处理冲突后重试：\n' +
+                '  cd D:\\妙妙小工具\\Elysia\\win-unpacked\\resources\\app\n' +
+                '  git status   # 查看冲突文件\n' +
+                '  git rebase --abort   # 取消 rebase\n' +
+                '  或解决冲突后 git rebase --continue\n\n' +
+                'git 输出：\n' + pullResult.output,
+            };
+          }
+          // 其他 pull 错误
+          this.error(`git pull --rebase 失败: ${pullResult.output}`);
+          return {
+            success: false,
+            message:
+              '⚠️ 拉取远程更新失败：' + pullResult.output +
+              '\n已取消推送，避免覆盖远程新提交。',
+          };
+        }
+        this.log('pull --rebase 完成');
+      }
+    }
+
     // 检查是否有未提交的更改
     const statusResult = this._git('status --porcelain', { cwd: dir });
     if (!statusResult.success) {
@@ -243,10 +297,6 @@ class UpdateManager {
     if (!statusResult.output) {
       // 没有更改需要提交
       // 但可能还有未推送的提交
-      const branchResult = this._git('rev-parse --abbrev-ref HEAD', {
-        cwd: dir,
-      });
-      const branch = branchResult.success ? branchResult.output : 'main';
       const aheadResult = this._git(
         `rev-list --count origin/${branch}..HEAD`,
         { cwd: dir }
@@ -303,9 +353,6 @@ class UpdateManager {
         message: '提交失败:\n' + commitResult.output,
       };
     }
-
-    const branchResult = this._git('rev-parse --abbrev-ref HEAD', { cwd: dir });
-    const branch = branchResult.success ? branchResult.output : 'main';
 
     const pushResult = this._git(`push origin ${branch}`, {
       cwd: dir,
