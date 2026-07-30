@@ -3727,6 +3727,35 @@ class AppController {
       console.warn('[AutoSync] 上次同步尚未完成，跳过本次');
       return;
     }
+
+    // ★ Bug A 修复：如果用户正在编辑备忘录，先自动保存当前内容，防止同步重建编辑器导致未保存输入丢失
+    if (this.editingMemoId !== null && window.currentQuill) {
+      try {
+        const htmlContent = window.currentQuill.root.innerHTML;
+        const textContent = window.currentQuill.getText().trim();
+        const titleEl = document.querySelector('.memo-title-input');
+        const title = titleEl ? titleEl.value.trim() : '';
+        if (textContent || title) {
+          const existingMemo = this.editingMemoId && this.editingMemoId !== ''
+            ? this.memos.find(m => String(m.id) === String(this.editingMemoId))
+            : null;
+          const memo = {
+            id: this.editingMemoId && this.editingMemoId !== '' ? this.editingMemoId : null,
+            content: textContent,
+            htmlContent: htmlContent,
+            title: title,
+            isPrivate: existingMemo ? existingMemo.isPrivate : false,
+            creator: existingMemo?.creator || XilianSettings?._config?.aiUserName || '我'
+          };
+          await this.memoManager.saveMemo(memo);
+          this.memos = this.memoManager.getMemos();
+          console.log('[AutoSync] 已自动保存正在编辑的备忘录，防止同步打断');
+        }
+      } catch (e) {
+        console.error('[AutoSync] 自动保存备忘录失败:', e);
+      }
+    }
+
     this._syncInProgress = true;
 
     try {
@@ -3771,7 +3800,10 @@ class AppController {
           this._initChatRoomFromCache();
           this.renderDailyTasks();
           this.renderDailyExpenses();
-          this.renderMemos();
+          // ★ Bug A 修复：正在编辑备忘录时不重建编辑器，防止丢失未保存输入
+          if (this.editingMemoId === null || !window.currentQuill) {
+            this.renderMemos();
+          }
           this.renderStatistics();
           this.renderJournalCalendar();
           this.loadJournalForDate(this.selectedDateStr);
@@ -5567,12 +5599,18 @@ class AppController {
     ipcRenderer.on('memos-updated', async () => {
       // 重新从主进程加载最新的备忘录数据，确保与便利贴同步
       await this.loadMemos();
-      
+
+      // ★ Bug A 修复：如果用户正在编辑备忘录，只刷新数据，不重建编辑器（防止丢失未保存输入）
+      if (this.editingMemoId !== null && window.currentQuill) {
+        console.log('[Sync] 用户正在编辑备忘录，跳过编辑器重建');
+        return;
+      }
+
       // 完全清理所有状态，不管之前是什么
       if (window.currentQuill) {
         window.currentQuill = null;
       }
-      
+
       // 检查编辑的备忘录是否还存在
       if (this.editingMemoId !== null) {
         if (this.editingMemoId === '') {
@@ -5585,7 +5623,7 @@ class AppController {
           }
         }
       }
-      
+
       this.renderMemos();
     });
 

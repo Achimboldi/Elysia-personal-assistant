@@ -1003,6 +1003,10 @@ function setupIpcHandlers() {
     const index = data.memos.findIndex(m => String(m.id) === String(memoId));
     if (index !== -1) {
       data.memos[index].pinned = !data.memos[index].pinned;
+      // ★ Bug B 修复：更新时间戳，防止元数据变更被云端旧版本覆盖
+      const now = new Date().toISOString();
+      data.memos[index].lastModified = now;
+      data.memos[index].updatedAt = now;
       const writeResult = await writeData(data.tasks, data.memos, data.expenses, data.budgets, data.settings, data.translationStats, data.categoryBudgets, data.secrets || [], data.journals || [], true);
       if (writeResult.success && mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('memos-updated');
@@ -1011,12 +1015,16 @@ function setupIpcHandlers() {
     }
     return { success: false, memo: null, message: '未找到备忘录' };
   });
-  
+
   ipcMain.handle('toggle-private-memo', async (event, memoId) => {
     const data = readData();
     const index = data.memos.findIndex(m => String(m.id) === String(memoId));
     if (index !== -1) {
       data.memos[index].isPrivate = !data.memos[index].isPrivate;
+      // ★ Bug B 修复：更新时间戳，防止元数据变更被云端旧版本覆盖
+      const now = new Date().toISOString();
+      data.memos[index].lastModified = now;
+      data.memos[index].updatedAt = now;
       const writeResult = await writeData(data.tasks, data.memos, data.expenses, data.budgets, data.settings, data.translationStats, data.categoryBudgets, data.secrets || [], data.journals || [], true);
       if (writeResult.success && mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('memos-updated');
@@ -1025,13 +1033,17 @@ function setupIpcHandlers() {
     }
     return { success: false, memo: null, message: '未找到备忘录' };
   });
-  
+
   ipcMain.handle('save-memo-order', async (event, orderedMemos) => {
     const data = readData();
+    // ★ Bug B 修复：排序变更也更新时间戳
+    const now = new Date().toISOString();
     orderedMemos.forEach((memo, index) => {
       const existingMemo = data.memos.find(m => String(m.id) === String(memo.id));
       if (existingMemo) {
         existingMemo.order = index;
+        existingMemo.lastModified = now;
+        existingMemo.updatedAt = now;
       }
     });
     const writeResult = await writeData(data.tasks, data.memos, data.expenses, data.budgets, data.settings, data.translationStats, data.categoryBudgets, data.secrets || [], data.journals || [], true);
