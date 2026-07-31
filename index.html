@@ -145,16 +145,34 @@
                 <div class="task-content">
                     <div class="task-content-inner">
                         <div id="tasksView" class="view-panel">
-                            <div id="dailyTasksSection" class="daily-tasks-section" style="display:none">
-                                <div class="daily-tasks-header">
-                                    <span class="daily-tasks-title">今日任务</span>
-                                    <span class="daily-tasks-count" id="dailyTasksCount"></span>
+                            <!-- ★ 任务左侧导航栏：每日任务 + 主任务快速跳转 -->
+                            <div id="taskSidebar" class="task-sidebar">
+                                <div class="task-sidebar-toolbar">
+                                    <span class="task-sidebar-brand">任务导航</span>
+                                    <button id="taskSidebarCollapseBtn" class="task-sidebar-collapse" title="收起导航栏" type="button">«</button>
                                 </div>
-                                <div id="dailyTasksContainerList" class="daily-tasks-list"></div>
-                                <div class="daily-task-add-row" id="dailyTaskAddRow">+ 添加今日任务</div>
+                                <div class="task-sidebar-group">
+                                    <div class="task-sidebar-group-title">每日任务 <span id="taskSidebarDailyCount" class="task-sidebar-count"></span></div>
+                                    <div id="taskSidebarDailyList" class="task-sidebar-list"></div>
+                                </div>
+                                <div class="task-sidebar-group">
+                                    <div class="task-sidebar-group-title">主任务 <span id="taskSidebarMainCount" class="task-sidebar-count"></span></div>
+                                    <div id="taskSidebarMainList" class="task-sidebar-list"></div>
+                                </div>
                             </div>
-                            <div class="daily-section">
-                                <div id="dailyTasksContainer" class="tasks-list"></div>
+                            <button id="taskSidebarExpandBtn" class="task-sidebar-expand" title="展开任务导航" type="button">»</button>
+                            <div class="task-scroll-area">
+                                <div id="dailyTasksSection" class="daily-tasks-section" style="display:none">
+                                    <div class="daily-tasks-header">
+                                        <span class="daily-tasks-title">今日任务</span>
+                                        <span class="daily-tasks-count" id="dailyTasksCount"></span>
+                                    </div>
+                                    <div id="dailyTasksContainerList" class="daily-tasks-list"></div>
+                                    <div class="daily-task-add-row" id="dailyTaskAddRow">+ 添加今日任务</div>
+                                </div>
+                                <div class="daily-section">
+                                    <div id="dailyTasksContainer" class="tasks-list"></div>
+                                </div>
                             </div>
                         </div>
                         <div id="expensesView" class="view-panel">
@@ -1724,6 +1742,6 @@
     <script src="xilian-settings.js?v=2026073004"></script>
     <script src="chat-room-manager.js?v=2026073004"></script>
     <script src="xilian-manager.js?v=2026073004"></script>
-    <script src="app.js?v=2026073007"></script>
+    <script src="app.js?v=2026073009"></script>
 </body>
 </html>

@@ -6158,6 +6158,9 @@ class AppController {
         editRow.querySelector('.daily-task-delete').onclick = cancel;
       };
     }
+
+    // ★ 同步刷新左侧导航栏
+    this.renderTaskSidebar();
   }
 
   async loadDailyTasks() {
@@ -6229,8 +6232,8 @@ class AppController {
       const priorityGroupClass = this.getPriorityGroupClass(task.priority);
       
       const taskGroup = document.createElement('div');
-      // ★ 方案E：默认展开，添加 task-group-expanded 类
-      taskGroup.className = `task-group task-group-expanded${isCompleted ? ' task-group-completed' : ''} ${priorityGroupClass}`;
+      // ★ 主任务详情默认折叠（用户可手动展开，展开状态会记忆）
+      taskGroup.className = `task-group task-group-collapsed${isCompleted ? ' task-group-completed' : ''} ${priorityGroupClass}`;
       taskGroup.setAttribute('data-id', task.id);
       // ★ 核选项：inline style 确保外层容器绝不裁剪内容（优先级高于一切CSS规则）
       taskGroup.style.overflow = 'visible';
@@ -6388,22 +6391,197 @@ class AppController {
     this.setupEditableFields();
     this.setupPrioritySelectors();
     this.setupTaskCollapse();
+
+    // ★ 同步刷新左侧导航栏
+    this.renderTaskSidebar();
   }
 
-  // ★ 方案E：任务折叠/展开交互
+  // ★ 任务左侧导航栏渲染：每日任务 + 主任务快速跳转
+  renderTaskSidebar() {
+    const dailyList = dom.get('taskSidebarDailyList');
+    const mainList = dom.get('taskSidebarMainList');
+    if (!dailyList || !mainList) return;
+
+    // ★ 首次渲染时绑定折叠/展开 + 滚动同步（只绑一次）
+    if (!this._taskSidebarEventsBound) {
+      this._taskSidebarEventsBound = true;
+      const sidebar = dom.get('taskSidebar');
+      const collapseBtn = dom.get('taskSidebarCollapseBtn');
+      const expandBtn = dom.get('taskSidebarExpandBtn');
+      const applySidebarCollapsed = (collapsed) => {
+        if (!sidebar) return;
+        sidebar.classList.toggle('collapsed', collapsed);
+        try { localStorage.setItem('taskSidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+      };
+      if (collapseBtn) collapseBtn.addEventListener('click', () => applySidebarCollapsed(true));
+      if (expandBtn) expandBtn.addEventListener('click', () => applySidebarCollapsed(false));
+      // 恢复记忆的收起状态
+      try {
+        if (localStorage.getItem('taskSidebarCollapsed') === '1') applySidebarCollapsed(true);
+      } catch (e) {}
+      this.setupTaskSidebarScrollSync();
+    }
+
+    // ── 每日任务分组 ──
+    const today = new Date().toISOString().slice(0, 10);
+    const dailyTasks = [...(this.dailyTasks || [])]
+      .map(t => ({ ...t, completed: t.dailyDate !== today ? false : t.completed === true }))
+      .sort((a, b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
+    const dailyCountEl = dom.get('taskSidebarDailyCount');
+    if (dailyCountEl) {
+      const remaining = dailyTasks.filter(t => !t.completed).length;
+      dailyCountEl.textContent = remaining > 0 ? `${remaining}` : '';
+    }
+    dailyList.innerHTML = '';
+    if (dailyTasks.length === 0) {
+      dailyList.innerHTML = '<div class="task-sidebar-empty">暂无今日任务</div>';
+    } else {
+      for (const dt of dailyTasks) {
+        const item = document.createElement('div');
+        item.className = 'task-sidebar-item' + (dt.completed ? ' is-done' : '');
+        item.setAttribute('data-sidebar-daily-id', dt.id);
+        item.innerHTML = `<span class="task-sidebar-text">${utils.escapeHtml(dt.title || '未命名任务')}</span>`;
+        item.addEventListener('click', () => this.jumpToTaskSidebar('daily', dt.id));
+        dailyList.appendChild(item);
+      }
+    }
+
+    // ── 主任务分组（按当前选中日期） ──
+    const dayTasks = this.tasks.filter(t => this.isTaskOnDate(t, this.selectedDateStr));
+    const priorityOrder = { urgent: 0, priority: 1, normal: 2, secondary: 3 };
+    const sortedMain = [...dayTasks].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      const ca = a.progress === 'completed', cb = b.progress === 'completed';
+      if (ca && !cb) return 1;
+      if (!ca && cb) return -1;
+      const pa = priorityOrder[a.priority] !== undefined ? priorityOrder[a.priority] : 2;
+      const pb = priorityOrder[b.priority] !== undefined ? priorityOrder[b.priority] : 2;
+      return pa - pb;
+    });
+    const mainCountEl = dom.get('taskSidebarMainCount');
+    if (mainCountEl) {
+      const remaining = sortedMain.filter(t => t.progress !== 'completed').length;
+      mainCountEl.textContent = remaining > 0 ? `${remaining}` : '';
+    }
+    mainList.innerHTML = '';
+    if (sortedMain.length === 0) {
+      mainList.innerHTML = '<div class="task-sidebar-empty">当日暂无主任务</div>';
+    } else {
+      for (const task of sortedMain) {
+        const isDone = task.progress === 'completed';
+        const item = document.createElement('div');
+        item.className = 'task-sidebar-item' + (isDone ? ' is-done' : '');
+        item.setAttribute('data-sidebar-main-id', task.id);
+        const pClass = 'p-' + (task.priority || 'normal');
+        item.innerHTML = `
+          <span class="task-sidebar-priority ${pClass}"></span>
+          <span class="task-sidebar-text">${utils.escapeHtml(task.title || '未命名任务')}</span>
+        `;
+        item.addEventListener('click', () => this.jumpToTaskSidebar('main', task.id));
+        mainList.appendChild(item);
+      }
+    }
+  }
+
+  // ★ 点击侧边栏任务 → 跳转到对应任务并高亮
+  jumpToTaskSidebar(type, id) {
+    let target = null;
+    if (type === 'daily') {
+      // 确保每日任务区块可见
+      const section = dom.get('dailyTasksSection');
+      if (section) section.style.display = 'block';
+      target = document.querySelector(`.daily-task-item[data-id="${id}"]`);
+    } else {
+      target = document.querySelector(`.task-group[data-id="${id}"]`);
+    }
+
+    if (target) {
+      // ★ 关键修复：scrollIntoView 会冒泡触发 body 滚动导致跨视图内容露出
+      //    改为精确控制 .task-scroll-area 的 scrollTop
+      const scrollArea = document.querySelector('.task-scroll-area');
+      if (scrollArea) {
+        const targetTop = target.offsetTop - 16; // 留 16px 顶部余白
+        scrollArea.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      } else {
+        target.scrollIntoView({ behavior: 'smooth', block: type === 'daily' ? 'center' : 'start' });
+      }
+      target.classList.remove('task-sidebar-highlight');
+      void target.offsetWidth; // 重启动画
+      target.classList.add('task-sidebar-highlight');
+      setTimeout(() => target.classList.remove('task-sidebar-highlight'), 2600);
+      // ★ 侧边栏 active 指示
+      this.setTaskSidebarActive(type, id);
+    }
+  }
+
+  // ★ 设置侧边栏 active 项（当前查看的任务）
+  setTaskSidebarActive(type, id) {
+    const sidebar = dom.get('taskSidebar');
+    if (!sidebar) return;
+    if (type === 'daily') {
+      sidebar.querySelectorAll('.task-sidebar-item[data-sidebar-daily-id]').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-sidebar-daily-id') === id);
+      });
+    } else {
+      sidebar.querySelectorAll('.task-sidebar-item[data-sidebar-main-id]').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-sidebar-main-id') === id);
+      });
+    }
+  }
+
+  // ★ 滚动右侧内容区时同步侧边栏 active（当前可见的任务）
+  setupTaskSidebarScrollSync() {
+    const scrollArea = document.querySelector('.task-scroll-area');
+    if (!scrollArea || this._sidebarScrollBound) return;
+    this._sidebarScrollBound = true;
+    let ticking = false;
+    scrollArea.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        try {
+          const groups = [...scrollArea.querySelectorAll('.task-group')];
+          const dailies = [...scrollArea.querySelectorAll('.daily-task-item')];
+          if (!groups.length && !dailies.length) return;
+          const mark = scrollArea.getBoundingClientRect().top + 60; // 视口顶部偏下一点
+          let curMain = null, curDaily = null;
+          for (const g of groups) {
+            if (g.getBoundingClientRect().top <= mark) curMain = g.getAttribute('data-id');
+            else break;
+          }
+          for (const d of dailies) {
+            if (d.getBoundingClientRect().top <= mark) curDaily = d.getAttribute('data-id');
+            else break;
+          }
+          if (curMain !== null && curMain !== this._sidebarActiveMain) {
+            this._sidebarActiveMain = curMain;
+            this.setTaskSidebarActive('main', curMain);
+          }
+          if (curDaily !== null && curDaily !== this._sidebarActiveDaily) {
+            this._sidebarActiveDaily = curDaily;
+            this.setTaskSidebarActive('daily', curDaily);
+          }
+        } catch (e) {}
+      });
+    });
+  }
+
+  // ★ 任务折叠/展开交互（默认折叠，用户手动展开的任务会记住展开状态）
   setupTaskCollapse() {
-    // 初始化折叠状态存储
-    if (!this._collapsedTasks) this._collapsedTasks = new Set();
-    
+    // ★ 语义反转：现在默认折叠，用 _expandedTasks 记录"用户手动展开过"的任务
+    if (!this._expandedTasks) this._expandedTasks = new Set();
+
     const collapseBtns = document.querySelectorAll('.task-collapse-btn');
     collapseBtns.forEach(btn => {
-      // 恢复折叠状态
+      // 恢复用户手动展开的状态
       const taskId = btn.getAttribute('data-id');
       const taskGroup = btn.closest('.task-group');
-      if (taskGroup && this._collapsedTasks.has(taskId)) {
-        taskGroup.classList.add('task-group-collapsed');
-        taskGroup.classList.remove('task-group-expanded');
-        btn.classList.add('collapsed');
+      if (taskGroup && this._expandedTasks.has(taskId)) {
+        taskGroup.classList.add('task-group-expanded');
+        taskGroup.classList.remove('task-group-collapsed');
+        btn.classList.remove('collapsed');
       }
       
       btn.addEventListener('click', (e) => {
@@ -6411,18 +6589,18 @@ class AppController {
         const tid = btn.getAttribute('data-id');
         const tGroup = btn.closest('.task-group');
         if (!tGroup) return;
-        
+
         const isCollapsed = tGroup.classList.contains('task-group-collapsed');
         if (isCollapsed) {
           tGroup.classList.remove('task-group-collapsed');
           tGroup.classList.add('task-group-expanded');
           btn.classList.remove('collapsed');
-          this._collapsedTasks.delete(tid);
+          this._expandedTasks.add(tid);
         } else {
           tGroup.classList.add('task-group-collapsed');
           tGroup.classList.remove('task-group-expanded');
           btn.classList.add('collapsed');
-          this._collapsedTasks.add(tid);
+          this._expandedTasks.delete(tid);
         }
       });
     });

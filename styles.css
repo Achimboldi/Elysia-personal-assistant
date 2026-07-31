@@ -757,15 +757,208 @@ body {
 
 #tasksView.active {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;           /* ★ 改为左右布局：侧边栏 + 内容区 */
   height: 100%;
+  overflow: hidden;
+}
+
+/* ★ 任务左侧导航栏 */
+.task-sidebar {
+  width: 100px;                  /* ★ 100px 窄栏，尽量少挤压内容区 */
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 6px;
+  /* ★ 与全局导航明显区分：紫色微光 + 更深底色 */
+  background:
+    linear-gradient(180deg, rgba(124, 58, 237, 0.10) 0%, rgba(124, 58, 237, 0.04) 100%),
+    var(--bg-secondary, rgba(0, 0, 0, 0.25));
+  border-right: 1px solid rgba(124, 58, 237, 0.18);
+  scrollbar-width: thin;
+  transition: width 0.18s ease;
+}
+/* ★ 收起状态：完全隐藏，让出全部宽度 */
+.task-sidebar.collapsed {
+  display: none;
+}
+
+/* 侧边栏顶部工具条 */
+.task-sidebar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 8px;
+}
+.task-sidebar-brand {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a855f7;
+  letter-spacing: 1px;
+}
+.task-sidebar-collapse {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #aaa);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.task-sidebar-collapse:hover {
+  background: rgba(124, 58, 237, 0.15);
+  color: #fff;
+}
+
+/* 收起后残留的展开按钮（窄条） */
+.task-sidebar-expand {
+  display: none;
+  flex-shrink: 0;
+  width: 20px;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, rgba(124, 58, 237, 0.10) 0%, rgba(124, 58, 237, 0.04) 100%),
+    var(--bg-secondary, rgba(0, 0, 0, 0.25));
+  border: none;
+  border-right: 1px solid rgba(124, 58, 237, 0.18);
+  color: #a855f7;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.task-sidebar-expand:hover {
+  color: #fff;
+  background: rgba(124, 58, 237, 0.2);
+}
+/* 侧边栏收起时显示展开按钮 */
+.task-sidebar.collapsed + .task-sidebar-expand {
+  display: flex;
+}
+
+.task-sidebar-group {
+  margin-bottom: 14px;
+}
+.task-sidebar-group-title {
+  font-size: 11px;               /* ★ 更小字号适配窄栏 */
+  font-weight: 700;
+  color: #a855f7;                /* ★ 主题色文字，区分全局导航 */
+  padding: 4px 6px 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.task-sidebar-count {
+  font-size: 9px;
+  background: rgba(124, 58, 237, 0.18);
+  color: #c084fc;
+  border-radius: 8px;
+  padding: 0 5px;
+  line-height: 14px;
+  flex-shrink: 0;
+}
+.task-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.task-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-primary, #eee);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+  line-height: 1.4;
+  position: relative;
+  /* ★ 窄栏强制单行省略，绝不溢出 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-sidebar-item:hover {
+  background: rgba(124, 58, 237, 0.14);
+}
+/* ★ 当前查看任务：左侧紫色竖条 + 高亮底 */
+.task-sidebar-item.active {
+  background: rgba(124, 58, 237, 0.20);
+  color: #fff;
+}
+.task-sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: #a855f7;
+}
+.task-sidebar-item .task-sidebar-priority {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.task-sidebar-item .task-sidebar-priority.p-urgent { background: #ef4444; }
+.task-sidebar-item .task-sidebar-priority.p-priority { background: #f97316; }
+.task-sidebar-item .task-sidebar-priority.p-normal { background: #3b82f6; }
+.task-sidebar-item .task-sidebar-priority.p-secondary { background: #9ca3af; }
+.task-sidebar-item .task-sidebar-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-sidebar-item.is-done .task-sidebar-text {
+  text-decoration: line-through;
+  color: var(--text-muted, #777);
+}
+.task-sidebar-empty {
+  font-size: 10px;
+  color: var(--text-muted, #777);
+  padding: 3px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ★ 任务右侧内容区：负责滚动 */
+.task-scroll-area {
+  flex: 1;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* ★ 关键：滚动不冒泡到 body / window，避免跨视图内容露出 */
+  overscroll-behavior: contain;
+  /* ★ 显式高度限制，让 scrollTo 在固定容器内生效 */
+  height: 100%;
+  max-height: 100%;
+  isolation: isolate;             /* 创建新层叠上下文，隔离滚动 */
 }
-#tasksView.active::-webkit-scrollbar {
+.task-scroll-area::-webkit-scrollbar {
   display: none;
+}
+
+/* ★ 跳转高亮动画 */
+@keyframes taskSidebarHighlight {
+  0% { box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.55); }
+  100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+}
+.task-sidebar-highlight {
+  animation: taskSidebarHighlight 1.2s ease-out 2;
+  border-radius: 12px;
 }
 
 /* 今日任务与普通任务作为一整个页面一起滚动，今日任务不再置顶/独立滚动 */
@@ -3730,27 +3923,23 @@ body {
 }
 
 .task-group.task-group-urgent {
-  border-left: 4px solid transparent;
+  border-left: 4px solid rgba(236, 72, 153, 0.85);
   background: linear-gradient(90deg, rgba(236, 72, 153, 0.08) 0%, rgba(236, 72, 153, 0.03) 25%, rgba(255, 255, 255, 0.95) 100%);
-  box-shadow: inset 4px 0 0 0 rgba(236, 72, 153, 0.85);
 }
 
 .task-group.task-group-high {
-  border-left: 4px solid transparent;
+  border-left: 4px solid rgba(168, 85, 247, 0.85);
   background: linear-gradient(90deg, rgba(168, 85, 247, 0.08) 0%, rgba(168, 85, 247, 0.03) 25%, rgba(255, 255, 255, 0.95) 100%);
-  box-shadow: inset 4px 0 0 0 rgba(168, 85, 247, 0.85);
 }
 
 .task-group.task-group-medium {
-  border-left: 4px solid transparent;
+  border-left: 4px solid rgba(139, 92, 246, 0.8);
   background: linear-gradient(90deg, rgba(139, 92, 246, 0.06) 0%, rgba(139, 92, 246, 0.02) 25%, rgba(255, 255, 255, 0.95) 100%);
-  box-shadow: inset 4px 0 0 0 rgba(139, 92, 246, 0.8);
 }
 
 .task-group.task-group-low {
-  border-left: 4px solid transparent;
+  border-left: 4px solid rgba(20, 184, 166, 0.8);
   background: linear-gradient(90deg, rgba(20, 184, 166, 0.06) 0%, rgba(20, 184, 166, 0.02) 25%, rgba(255, 255, 255, 0.95) 100%);
-  box-shadow: inset 4px 0 0 0 rgba(20, 184, 166, 0.8);
 }
 
 .task-main {
