@@ -599,7 +599,8 @@
                                         var tb = document.getElementById('tb-count');
                                         var txt = tb ? tb.textContent : '';
                                         var isLost = txt.indexOf('connection lost') >= 0;
-                                        var isZero = /0\s*碎片/.test(txt);
+                                        // ★ 修复：用 (\D|^) 锚定，确保不是 "90 碎片" 里的中间 0
+                                        var isZero = /(\D|^)0\s*碎片/.test(txt);
                                         if (isLost || isZero) {
                                             overlay.style.display = 'block';
                                             if (isLost) hint.innerHTML = '星图数据库尚未就绪。点击下方按钮可立即触发一次<br>Scribe+Archivist 流水线（需先有聊天/资料被录入）。';
