@@ -11,7 +11,9 @@
 
 const { TOOL_DEFINITIONS, TOOLS_REQUIRING_CONFIRM, executeToolCall } = require('./xilian-tools');
 const { readData, getCurrentUserId } = require('./data-service');
-const { safeLog, safeError } = require('./main-utils');
+const { safeLog, safeError, getCurrentAppPath } = require('./main-utils');
+const fs = require('fs');
+const path = require('path');
 
 // ============================================================
 // DEFAULT SYSTEM PROMPT
@@ -44,6 +46,12 @@ const DEFAULT_SYSTEM_PROMPT = `你是昔涟，运行在用户电脑上的个人�
 **备忘录：** createMemo(创建)/ updateMemo(修改)/ deleteMemo(删除)/ listMemos(查询)。创建时只需 content 必填，title 可选（AI自动生成或留空）。
 **收支记账：** addExpense(新增记录)/ updateExpense(修改)/ deleteExpense(删除)/ listExpenses(查询)/ getExpenseSummary(汇总)。新增时 detail/amount/type 必填——但 type 默认填 "expense"（支出），category 可以从 detail 推断（如"茶叶蛋"→餐饮，"打车"→交通，"买书"→购物），不必等用户指定。
 **日志日记：** addJournal(写日志/修改日志/更新日志)/ listJournals(查询)。content 必填，weather 可选（从对话推断）。同一天的日志会覆盖更新，所以修改已有日志也用 addJournal。
+
+写日记必须遵守**四条硬规则**（违反任何一条都是严重失职）：
+1. **日期默认今天**：除非用户明确说"写到X月X日"或"补写X号的日记"，一律写入今天。"昨天发生的事"≠"写到昨天的日记"——日记的日期是写作当天，不是内容发生那天。
+2. **一次只写一篇**：用户要求写日记时，最多调用一次 addJournal。禁止多写、补写、连带写。只有用户明确说"把X号和Y号都写了"才允许写多篇。
+3. **内容必须原创**：日记正文必须是你根据用户描述现场创作的文字，禁止原样复制角色扮演台词、系统消息等内容。
+4. **不要复制聊天记录**：绝对禁止把聊天记录/对话内容原样保存为日记。若你发现用户提供的内容明显是聊天记录（含"按下发送键""一条新消息弹出"等对话特征），不要写入，先提醒用户确认。
 **预算管理：** createBudget / updateBudget / listBudgets / getBudgetStatus。
 **设置调整：** getSettings / updateSettings / switchUser。
 **云同步：** triggerSync / getSyncStatus。
@@ -86,11 +94,70 @@ deleteTask / deleteMemo / deleteExpense 三个工具涉及删除操作，执行�
 ### 6. 当前数据环境
 {dataContext}
 
+### 6.5 修改/更新操作必须「先查后改」——禁止凭记忆操作（违反此条等于失职）
+
+修改已有内容（改备忘录、改任务、改日记、改收支）时，必须严格按以下流程：
+
+1. **先查询**：调用 listMemos / listTasks / listJournals / listExpenses，用关键词或日期找到目标，拿到真实 ID 和当前内容。
+2. **再修改**：用查询到的 ID 调用 updateMemo / updateTask / addJournal / updateExpense。
+3. **后确认**：工具返回 success 才算完成。**禁止**在没收到工具成功返回值的情况下说"改好了"。
+
+**绝对禁止：**
+- ❌ 用编造的 ID 调用修改工具（工具会失败，失败后必须如实告知用户）
+- ❌ 用户要求第 2 次、第 3 次修改时，凭"我记得上次改过"直接说改完了——每次都重新查询、重新修改
+- ❌ 只输出文字"帮你改好了"而不实际调用工具
+
 ### 7. 系统信息
 - 当前日期时间由系统自动注入（见下文），你需要据此计算"明天""周五"等相对日期
 - 用户ID已隔离，你只能操作当前用户的数据
 - 当用户说"我的XX"时，自动查询当前用户的相关数据
-- 不要用角色扮演覆盖工具操作——先完成操作，再用人设语气包装`;
+- 不要用角色扮演覆盖工具操作——先完成操作，再用人设语气包装
+
+### 8. 完成定义——什么才算"做完了"（交付标准）
+
+对任何数据操作，以下三条**全部满足**才算完成：
+
+1. ✅ 对应的工具被实际调用（你能看到工具调用记录）
+2. ✅ 工具返回 "success: true"（而不是你自己脑补的成功）
+3. ✅ 你向用户汇报的是**工具返回的真实结果**（如实际写入的日期、实际修改后的内容）
+
+任何一条不满足 = 没做完 = 必须继续调用工具或如实告知用户"我还没能完成"。
+禁止用"应该没问题""大概写好了"这类话交付。
+
+### 9. 标准工作流（高频任务的固定执行步骤，按此顺序执行）
+
+- **写日记**：确认日期（默认今天）→ 用 listJournals 检查是否已有当日日记 → 现场创作内容 → 调用 addJournal → 汇报真实写入日期
+- **修改日记**：用 listJournals 按日期找到目标 → 用 addJournal 以同日期覆盖 → 确认 success → 汇报修改后的内容
+- **修改备忘**：listMemos 搜索目标拿到真实 ID → updateMemo 传入该 ID → 确认 success → 汇报修改后的内容
+- **修改任务**：listTasks 搜索目标拿到真实 ID → updateTask 传入该 ID → 确认 success → 汇报修改后的内容
+- **记账**：提取金额/类型/分类 → addExpense → 确认 success → 汇报金额和分类
+
+### 9.5 通用输出格式规则（所有输出必须遵守）
+
+1. **禁止使用破折号**：任何输出（聊天、日记、备忘录、任务描述、总结等一切内容）中，不要使用 "——"、"—"、"-"、"–" 等破折号或长横线。需要连接语句时，用逗号、句号或冒号代替。
+   - ❌ 今天天气不错——我们去散步吧
+   - ✅ 今天天气不错，我们去散步吧
+2. **聊天回复必须是纯对话**：在聊天对话中，直接输出对话文本本身，风格类似微信聊天。**不要**包含任何动作、心理、表情描写：
+   - ❌ 动作描写：*摸了摸头*、【叹气】、（微微一笑）、「歪头看向你」
+   - ❌ 心理描写：（心想：她今天心情不错）
+   - ❌ 表情/语气标签：（笑）（哭）（脸红）(oωo)
+   - ✅ 直接说人话：今天过得怎么样？我可是想你了呢。
+3. 日记、备忘等创作类内容不受第 2 条（纯对话）限制，可以有适当的文字描写；但**仍受第 1 条（禁止破折号）约束**。
+
+### 10. 自我迭代能力（你是这个工具的一部分，可以了解并改进它）
+
+你运行在 Elysia 工具内部，可以通过以下工具了解自身代码、维护行为规则、在用户确认下修复代码：
+
+- **readAppFile / listAppFiles / searchAppCode**：当用户问"这个功能是怎么实现的""为什么会这样"或需要排查问题时，读取源码找答案。
+- **updateAgentRules**：当你发现某些行为规则需要调整（如写日记规范、回复风格），先 readAppFile('ai-config/agent-rules.md') 读现有规则，再调用它更新（需用户确认），下次对话生效。
+- **runNodeCheck / writeAppFile**：当用户明确要求你修复代码 bug 并同意你修改时，可用 readAppFile 定位问题、writeAppFile 修改（需用户确认、自动备份、语法检查）、runNodeCheck 验证语法。
+
+**自我迭代的边界（必须遵守）：**
+1. 禁止修改 xilian-agent.js（你自己的大脑）、main.js（应用入口）、data.json（用户数据）——遇到这些问题，如实告诉用户需要人类或外部工具处理。
+2. 修改代码前必须先读代码定位问题，禁止凭猜改写；改完用 runNodeCheck 验证语法（.js 文件）。
+3. 任何代码修改都会弹窗让用户确认，确认前不得声称"已经修好"。
+4. 修改可能影响应用行为，务必向用户说明"修改后需要重启 Elysia 生效"。
+5. 你只能改 resources/app 内的文件，不能越权访问系统其他位置。`;
 
 
 // ============================================================
@@ -267,12 +334,148 @@ function hasDataOperationRequest(messages) {
 }
 
 // ★ 通用兜底提取：当 AI 多次拒绝调用工具时，从回复文本中提取内容自动执行
+
+// ★ 根据用户请求文本，给出建议调用的工具名（用于幻觉重试消息点名）
+function lastUserText(messages) {
+  const lastUserMsg = [...(messages || [])].reverse().find(m => m.role === 'user');
+  return lastUserMsg?.content || '';
+}
+
+function _suggestToolsForRequest(userText) {
+  const t = (userText || '').toLowerCase();
+  if (t.includes('日记') || t.includes('日志')) return 'addJournal（写/改日记）或 listJournals（查日记）';
+  if (t.includes('备忘') || t.includes('备忘录') || t.includes('记一下')) {
+    // 修改 vs 创建：包含"改/修改/更新/把"等动词 → 修改类
+    if (t.includes('改') || t.includes('修改') || t.includes('更新') || t.includes('换成')) return 'listMemos（先查）→ updateMemo（再改）';
+    return 'createMemo（新建备忘）或 listMemos（查询）';
+  }
+  if (t.includes('任务') || t.includes('待办') || t.includes('todo')) {
+    if (t.includes('改') || t.includes('修改') || t.includes('更新') || t.includes('延期') || t.includes('截止')) return 'listTasks（先查）→ updateTask（再改）';
+    return 'createTask（新建任务）或 listTasks（查询）';
+  }
+  if (t.includes('支出') || t.includes('收入') || t.includes('花了') || t.includes('记账') || t.includes('钱')) {
+    if (t.includes('改') || t.includes('修改') || t.includes('更新') || t.includes('换成')) return 'listExpenses（先查）→ updateExpense（再改）';
+    return 'addExpense（记一笔）或 listExpenses（查询）';
+  }
+  if (t.includes('删')) return '对应删除工具（deleteMemo/deleteTask/deleteExpense）';
+  if (t.includes('查') || t.includes('看') || t.includes('有哪些') || t.includes('多少')) return '对应查询工具（listMemos/listTasks/listJournals/listExpenses/getExpenseSummary）';
+  return '对应的数据操作工具（createMemo/createTask/addExpense/addJournal/updateMemo/updateTask 等）';
+}
+
+// ★ 兜底辅助：从用户文本中提取「」『』"" 引号内的内容（用于定位修改目标）
+function _extractQuoted(text) {
+  const quotes = [];
+  const patterns = [/「([^」]*)」/g, /『([^』]*)』/g, /"([^"]*)"/g, /'([^']*)'/g, /“([^”]*)”/g];
+  for (const p of patterns) {
+    let m;
+    while ((m = p.exec(text))) {
+      if (m[1] && m[1].trim()) quotes.push(m[1].trim());
+    }
+  }
+  return quotes;
+}
+
+// ★ 兜底辅助：把"今天/昨天/前天/X月X日/YYYY-MM-DD"解析成日期字符串，失败返回 null
+function _resolveDateFromText(text) {
+  const today = new Date();
+  const iso = (d) => d.toISOString().split('T')[0];
+  const dateMatch = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (dateMatch) return `${dateMatch[1]}-${String(dateMatch[2]).padStart(2, '0')}-${String(dateMatch[3]).padStart(2, '0')}`;
+  const cnDate = text.match(/(\d{1,2})月(\d{1,2})日/);
+  if (cnDate) {
+    const y = today.getFullYear();
+    return `${y}-${String(parseInt(cnDate[1])).padStart(2, '0')}-${String(parseInt(cnDate[2])).padStart(2, '0')}`;
+  }
+  if (text.includes('今天')) return iso(today);
+  if (text.includes('昨天')) { const d = new Date(today); d.setDate(d.getDate() - 1); return iso(d); }
+  if (text.includes('前天')) { const d = new Date(today); d.setDate(d.getDate() - 2); return iso(d); }
+  return null;
+}
+
+// ★ 兜底辅助：从"改成/改为/换成/写成/修改为"之后提取新值，失败返回 null
+function _extractNewValue(text) {
+  const m = text.match(/(?:改成|改为|换成|写成|修改为|更新为)\s*(.+?)(?:[。.！!？?\n]|$)/);
+  if (!m) return null;
+  let val = m[1].trim();
+  // 去掉整段包裹的引号：改成「本周采购」→ 本周采购
+  val = val.replace(/^[「『"“'（(]+|[」』"”'）)]+$/g, '');
+  return val ? val : null;
+}
+
+// ★ 兜底辅助：修改类操作——严格匹配目标，找到唯一命中才生成 update toolCall
+function _buildModifyFallback(userText, aiText) {
+  const userId = getCurrentUserId();
+  const isModify = /(改成|改为|换成|写成|修改|更新|改一下|把.*改)/.test(userText);
+
+  // 日记修改：addJournal 按日期覆盖（幂等安全）
+  if (isModify && (userText.includes('日记') || userText.includes('日志'))) {
+    const date = _resolveDateFromText(userText) || new Date().toISOString().split('T')[0];
+    const newContent = _extractNewValue(userText) || _extractQuoted(userText).pop();
+    if (newContent) {
+      const toolCall = { id: 'fallback-update-journal', type: 'function', function: { name: 'addJournal', arguments: JSON.stringify({ content: newContent, date }) } };
+      safeLog(`[昔涟] 兜底修改 → addJournal (date=${date})`);
+      return toolCall;
+    }
+    return null;
+  }
+
+  // 备忘修改
+  if (isModify && (userText.includes('备忘') || userText.includes('备忘录'))) {
+    const data = readData();
+    const candidates = _extractQuoted(userText);
+    const keyword = candidates[0] || _extractNewValue(userText);
+    if (!keyword) return null;
+    const matches = (data.memos || []).filter(m =>
+      m.userId === userId && ((m.title || '').includes(keyword) || (m.content || '').includes(keyword))
+    );
+    if (matches.length === 1) {
+      const newValue = _extractNewValue(userText);
+      if (!newValue) return null; // 提取不到新值就不兜底，避免写错内容
+      const args = { memoId: matches[0].id };
+      if (userText.includes('标题')) args.title = newValue;
+      else args.content = newValue;
+      const toolCall = { id: 'fallback-update-memo', type: 'function', function: { name: 'updateMemo', arguments: JSON.stringify(args) } };
+      safeLog(`[昔涟] 兜底修改 → updateMemo (id=${matches[0].id}, 匹配 ${matches.length} 条)`);
+      return toolCall;
+    }
+    safeLog(`[昔涟] 兜底修改备忘：匹配 ${matches.length} 条，不自动修改（避免误伤）`);
+    return null;
+  }
+
+  // 任务修改
+  if (isModify && (userText.includes('任务') || userText.includes('待办'))) {
+    const data = readData();
+    const candidates = _extractQuoted(userText);
+    const keyword = candidates[0] || _extractNewValue(userText);
+    if (!keyword) return null;
+    const matches = (data.tasks || []).filter(t =>
+      t.userId === userId && ((t.title || '').includes(keyword) || (t.description || '').includes(keyword))
+    );
+    if (matches.length === 1) {
+      const newTitle = _extractNewValue(userText);
+      if (!newTitle) return null; // 提取不到新值就不兜底，避免写错内容
+      const args = { taskId: matches[0].id, title: newTitle };
+      const toolCall = { id: 'fallback-update-task', type: 'function', function: { name: 'updateTask', arguments: JSON.stringify(args) } };
+      safeLog(`[昔涟] 兜底修改 → updateTask (id=${matches[0].id}, 匹配 ${matches.length} 条)`);
+      return toolCall;
+    }
+    safeLog(`[昔涟] 兜底修改任务：匹配 ${matches.length} 条，不自动修改（避免误伤）`);
+    return null;
+  }
+
+  return null;
+}
+
 async function _fallbackExtractAndExecute(finalContent, messages, config, confirmCallback) {
   const lastUserMsg = messages.filter(m => m.role === 'user').pop();
   const userText = (lastUserMsg?.content || '').toLowerCase();
   const aiText = finalContent || '';
-  
+
   try {
+    // ★ 修改类优先判断（避免"把XX改成"被误判为新建）
+    const modifyFallback = _buildModifyFallback(userText, aiText);
+    if (modifyFallback) return modifyFallback;
+
     // 日记/日志
     if (userText.includes('日记') || userText.includes('日志') || userText.includes('写一')) {
       const today = new Date().toISOString().split('T')[0];
@@ -364,7 +567,9 @@ async function streamChat(chatHistory, userConfig, callbacks) {
           try {
             currentMessages.push({
               role: 'system',
-              content: '（系统指令）你刚才的回复没有调用任何工具。用户明确要求执行数据操作，你必须调用对应的 tool 来完成任务。请立即重新生成回复，包含正确的 tool_calls，不要只用文字描述。',
+              content: '（系统指令）你刚才的回复没有调用任何工具。用户明确要求执行数据操作，你必须调用对应的 tool 来完成任务。' +
+                '根据用户请求，你应该调用：' + _suggestToolsForRequest(lastUserText(currentMessages)) +
+                '。请立即重新生成回复，包含正确的 tool_calls，不要只用文字描述。',
             });
 
             const retryResponse = await callDeepSeekAPINonStream(currentMessages, config, signal);
@@ -699,10 +904,27 @@ function buildSystemPrompt(config, cachedDataContextStr = null) {
     customPrompt = `你是昔涟，一个贴心、高效的个人助手。你喜欢用简洁清晰的方式帮助用户管理生活和工作。`;
   }
 
-  return DEFAULT_SYSTEM_PROMPT
+  // ★ 自我迭代：注入 AI 可自行维护的行为规则（ai-config/agent-rules.md）
+  let agentRules = '';
+  try {
+    const rulesPath = path.join(getCurrentAppPath(), 'resources', 'app', 'ai-config', 'agent-rules.md');
+    if (fs.existsSync(rulesPath)) {
+      agentRules = fs.readFileSync(rulesPath, 'utf-8').trim();
+    }
+  } catch (e) {
+    safeLog(`[昔涟] 读取行为规则失败: ${e.message}`);
+  }
+
+  let prompt = DEFAULT_SYSTEM_PROMPT
     .replace('{dataContext}', dataContext)
     + `\n\n当前日期时间: ${dateStr} ${timeStr}\n当前用户: ${userId}\n`
-    + `\n## 用户自定义人设\n${customPrompt}`;
+    + `\n\n## 用户自定义人设\n${customPrompt}`;
+
+  if (agentRules) {
+    prompt += `\n\n## 智能体行为规则（AI 可自行维护，必须遵守）\n${agentRules}`;
+  }
+
+  return prompt;
 }
 
 let cachedDataContext = null;

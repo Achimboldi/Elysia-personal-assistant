@@ -285,6 +285,17 @@ class XilianManager {
         ipcRenderer.on('chat-error', this.handleStreamError);
         ipcRenderer.on('chat-confirm-request', this.handleConfirmRequest);
 
+        // ★ 工具进度面板折叠状态持久化（XilianUI 触发）
+        window.addEventListener('xilian-tool-progress-toggled', (e) => {
+            const { msgId, collapsed } = e.detail || {};
+            if (!msgId) return;
+            const msg = this.chatHistory.find(m => m.id === msgId);
+            if (msg) {
+                msg.toolProgressCollapsed = !!collapsed;
+                this.saveHistory();
+            }
+        });
+
         // 数据更新监听
         ipcRenderer.on('tasks-updated', () => {
             // 聊天视图激活时才刷新，避免不必要的操作
@@ -1063,18 +1074,22 @@ class XilianManager {
     async handleConfirmRequest(event, { action, itemId, itemTitle }) {
         const { ipcRenderer } = require('electron');
 
-        const labels = {
-            deleteTask: '任务',
-            deleteMemo: '备忘录',
-            deleteExpense: '收支记录'
+        const confirmInfo = {
+            deleteTask: { label: '任务', verb: '删除' },
+            deleteMemo: { label: '备忘录', verb: '删除' },
+            deleteExpense: { label: '收支记录', verb: '删除' },
+            writeAppFile: { label: '代码文件', verb: '修改' },
+            updateAgentRules: { label: '智能体行为规则', verb: '更新' }
         };
-        const label = labels[action] || '项目';
+        const info = confirmInfo[action] || { label: '项目', verb: '执行' };
+        const label = info.label;
+        const verb = info.verb;
         const title = itemTitle ? `「${itemTitle}」` : '';
 
         // 使用 confirm 弹窗
         const confirmed = window.confirm(
-            `⚠️ 昔涟请求删除${label}${title}\n\n` +
-            `操作: ${action}\nID: ${itemId}\n\n确定要删除吗？`
+            `⚠️ 昔涟请求${verb}${label}${title}\n\n` +
+            `操作: ${action}\n目标: ${itemId || '(无)'}\n\n确定要${verb}吗？`
         );
 
         // ★ P0-3 修复：直接发送 chat-confirm-response-once（与 main.js 的 ipcMain.once 对齐）
@@ -1101,7 +1116,9 @@ class XilianManager {
             getSettings: '读取设置', updateSettings: '更新设置',
             switchUser: '切换用户',
             triggerSync: '云同步', getSyncStatus: '同步状态',
-            getDashboard: '获取概览'
+            getDashboard: '获取概览',
+            listAppFiles: '列出源码文件', readAppFile: '读取源码', searchAppCode: '搜索代码',
+            runNodeCheck: '语法检查', writeAppFile: '修改代码', updateAgentRules: '更新行为规则'
         };
         return labels[name] || name;
     }

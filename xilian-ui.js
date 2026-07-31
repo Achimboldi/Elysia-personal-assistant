@@ -187,10 +187,6 @@ const XilianUI = {
                     </div>
                 </div>
             `;
-            // ★ 渲染完成后，如果有 toolEvents，重建工具进度面板（折叠状态）
-            if (msg.toolEvents && msg.toolEvents.length > 0) {
-                this.restoreToolProgressFromEvents(msg.id, msg.toolEvents);
-            }
         } else if (msg.role === 'system') {
             msgEl.innerHTML = `
                 <div class="xilian-message-bubble">
@@ -200,6 +196,13 @@ const XilianUI = {
         }
 
         container.appendChild(msgEl);
+
+        // ★ 关键修复：先 appendChild 到 DOM，restore 里的 getElementById 才能找到 panel
+        // 同时把消息对象上的折叠状态保留下来（用户上次是展开还是收起）
+        if (msg.role === 'assistant' && msg.toolEvents && msg.toolEvents.length > 0) {
+            this.restoreToolProgressFromEvents(msg.id, msg.toolEvents, msg.toolProgressCollapsed);
+        }
+
         if (!skipScroll) this.scrollToBottom();
         return msgEl;
     },
@@ -552,6 +555,12 @@ const XilianUI = {
         panel.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
         const toggle = panel.querySelector('.xilian-tool-progress-toggle');
         if (toggle) toggle.textContent = collapsed ? '▼' : '▶';
+        // ★ 通知管理器：把折叠状态持久化到消息对象并保存历史
+        try {
+            window.dispatchEvent(new CustomEvent('xilian-tool-progress-toggled', {
+                detail: { msgId, collapsed: !collapsed }
+            }));
+        } catch (e) {}
     },
 
     /**
@@ -559,7 +568,7 @@ const XilianUI = {
      * @param {string} msgId - 消息ID
      * @param {Array} toolEvents - [{ name, args, status, result, toolCallId }]
      */
-    restoreToolProgressFromEvents(msgId, toolEvents) {
+    restoreToolProgressFromEvents(msgId, toolEvents, collapsed = true) {
         if (!toolEvents || toolEvents.length === 0) return;
         const panel = document.getElementById(`toolProgress_${msgId}`);
         if (!panel) return;
@@ -622,12 +631,13 @@ const XilianUI = {
         }
         roundEl.textContent = '';
 
-        // 显示面板并设为折叠
+        // 显示面板并按用户上次状态折叠/展开（默认折叠）
         panel.style.display = '';
         panel.style.opacity = '';
-        panel.setAttribute('data-collapsed', 'true');
+        const collapsedBool = !!collapsed;
+        panel.setAttribute('data-collapsed', collapsedBool ? 'true' : 'false');
         const toggle = panel.querySelector('.xilian-tool-progress-toggle');
-        if (toggle) toggle.textContent = '▶';
+        if (toggle) toggle.textContent = collapsedBool ? '▶' : '▼';
     },
 
     // ============================================================

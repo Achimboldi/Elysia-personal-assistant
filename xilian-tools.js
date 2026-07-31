@@ -7,7 +7,10 @@
 const { readData, writeData, getCurrentUserId, readDailyTasks, createDailyTask, updateDailyTask, deleteDailyTask } = require('./data-service');
 const { sendToAllWindows: broadcast } = require('./main-utils');
 const { v4: uuidv4 } = require('uuid');
-const { safeLog, safeError } = require('./main-utils');
+const { safeLog, safeError, getCurrentAppPath } = require('./main-utils');
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
 
 // ============================================================
 // EXPENSE CATEGORIES（与前端一致）
@@ -576,13 +579,105 @@ const TOOL_DEFINITIONS = [
         required: []
       }
     }
+  },
+  // ========== 自我迭代（6）==========
+  // ★ AI 可读自己的源码、维护自己的行为规则、在用户确认下修改代码
+  {
+    type: 'function',
+    function: {
+      name: 'listAppFiles',
+      description: '列出 Elysia 应用的源代码文件清单（resources/app 下，不含 node_modules/memory/.git）。当你想了解工具由哪些文件构成、或需要定位某个功能在哪个文件时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          keyword: { type: 'string', description: '文件名关键词筛选（可选，如 "xilian"、"main"、"data"）' },
+          limit: { type: 'number', description: '返回条数上限，默认 200' }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'readAppFile',
+      description: '读取 Elysia 应用的某个源代码文件内容（仅限 resources/app 内，禁止 ../ 越权）。当用户问"这个功能是怎么实现的""为什么会有这个行为"或你需要审查代码时使用。文件过大时只返回开头部分。',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: '相对路径，如 "app.js"、"xilian-tools.js"、"index.html"（必填）' },
+          lineCount: { type: 'number', description: '最多读取的行数（可选，默认 300 行）' }
+        },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'searchAppCode',
+      description: '在 Elysia 源代码中搜索关键词（按文件名/内容匹配，不含 node_modules/memory）。当你想定位某个函数、某个报错、某个字段在哪些文件出现时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          keyword: { type: 'string', description: '搜索关键词（必填）' },
+          limit: { type: 'number', description: '返回匹配行数上限，默认 20' }
+        },
+        required: ['keyword']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'runNodeCheck',
+      description: '对 Elysia 的一个 .js 文件做语法检查（node --check）。修改代码后必须调用此工具验证语法，语法不通过不得声称修改成功。',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: '相对路径，如 "app.js"（仅限 .js 文件，resources/app 内）' }
+        },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'writeAppFile',
+      description: '⚠️ 需要用户确认。修改 Elysia 的源代码文件（仅限 resources/app 内）。修改前系统会自动备份原文件；.js 文件会先做语法检查，通过后才写入。禁止修改 xilian-agent.js / main.js / data.json（引擎与数据文件）。用户报告 bug 并同意你修复代码时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: '相对路径，如 "app.js"、"xilian-tools.js"、"index.html"、"styles.css"（必填）' },
+          content: { type: 'string', description: '文件的完整新内容（必填，必须是完整文件，不是补丁）' },
+          changeNote: { type: 'string', description: '本次修改说明（简要描述改了什么、为什么）' }
+        },
+        required: ['path', 'content', 'changeNote']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'updateAgentRules',
+      description: '⚠️ 需要用户确认。更新你自己的行为规则（写入 ai-config/agent-rules.md，下次对话自动生效）。当你发现某些行为规则需要调整（如写日记规范、日期处理、回复风格）时使用。先 readAppFile 读取现有规则，再传入修改后的完整内容。',
+      parameters: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', description: '规则文件的完整新内容（Markdown 格式，必填）' },
+          changeNote: { type: 'string', description: '本次规则修改说明（简要描述加了什么规则、为什么）' }
+        },
+        required: ['content', 'changeNote']
+      }
+    }
   }
 ];
 
 // ============================================================
 // CONFIRM-REQUIRED TOOLS
 // ============================================================
-const TOOLS_REQUIRING_CONFIRM = ['deleteTask', 'deleteMemo', 'deleteExpense'];
+const TOOLS_REQUIRING_CONFIRM = ['deleteTask', 'deleteMemo', 'deleteExpense', 'writeAppFile', 'updateAgentRules'];
 
 // ============================================================
 // TOOL EXECUTION DISPATCH
@@ -631,13 +726,24 @@ async function executeToolCall(toolCall, confirmCallback) {
     }
   }
 
-  // 删除确认检查
+  // 确认检查（删除操作 + 代码修改 + 规则更新）
   if (TOOLS_REQUIRING_CONFIRM.includes(name) && confirmCallback) {
-    const idField = name === 'deleteTask' ? 'taskId' : name === 'deleteMemo' ? 'memoId' : 'expenseId';
-    const titleField = name === 'deleteTask' ? 'taskTitle' : name === 'deleteMemo' ? 'memoTitle' : 'expenseDetail';
-    const confirmed = await confirmCallback(name, args[idField], args[titleField] || '');
+    let confirmId = '', confirmTitle = '';
+    if (name === 'writeAppFile') {
+      confirmId = args.path || '';
+      confirmTitle = args.changeNote || '';
+    } else if (name === 'updateAgentRules') {
+      confirmId = 'ai-config/agent-rules.md';
+      confirmTitle = args.changeNote || '';
+    } else {
+      const idField = name === 'deleteTask' ? 'taskId' : name === 'deleteMemo' ? 'memoId' : 'expenseId';
+      const titleField = name === 'deleteTask' ? 'taskTitle' : name === 'deleteMemo' ? 'memoTitle' : 'expenseDetail';
+      confirmId = args[idField];
+      confirmTitle = args[titleField] || '';
+    }
+    const confirmed = await confirmCallback(name, confirmId, confirmTitle);
     if (!confirmed) {
-      return { success: false, message: '用户取消了删除操作' };
+      return { success: false, message: '用户取消了操作' };
     }
   }
 
@@ -650,7 +756,9 @@ async function executeToolCall(toolCall, confirmCallback) {
     createBudget, updateBudget, listBudgets, getBudgetStatus,
     getSettings, updateSettings, switchUser,
     triggerSync, getSyncStatus,
-    getDashboard
+    getDashboard,
+    // ★ 自我迭代工具
+    listAppFiles, readAppFile, searchAppCode, runNodeCheck, writeAppFile, updateAgentRules
   };
 
   // 记忆工具走 lazy require（encryption.js 需 .env 已加载，避免顶层 require 导致初始化失败）
@@ -1620,6 +1728,194 @@ async function _deleteGeneric(id, collection, label, title) {
 }
 
 // ============================================================
+// SELF-ITERATION TOOLS（自我迭代工具）
+// ============================================================
+
+// ★ 安全路径解析：仅允许 resources/app 内的文件
+function _getAppDir() {
+  try {
+    const base = getCurrentAppPath ? getCurrentAppPath() : path.join(__dirname);
+    return path.join(base, 'resources', 'app');
+  } catch (e) {
+    return path.join(__dirname);
+  }
+}
+
+function _safeResolve(relPath) {
+  const appDir = path.resolve(_getAppDir());
+  const resolved = path.resolve(appDir, relPath || '');
+  if (resolved !== appDir && !resolved.startsWith(appDir + path.sep)) {
+    return null;
+  }
+  return resolved;
+}
+
+const _CODE_EXTENSIONS = ['.js', '.html', '.css', '.json', '.md'];
+const _SKIP_DIRS = ['node_modules', 'memory', '.git', '.dart_tool', 'build', 'xushi', '.icon-ico', 'ai-config'];
+
+// ★ 递归收集源代码文件（相对路径）
+function _collectAppFiles(relDir, depth = 0) {
+  const results = [];
+  if (depth > 4) return results;
+  const dirAbs = _safeResolve(relDir);
+  if (!dirAbs) return results;
+  let entries = [];
+  try { entries = fs.readdirSync(dirAbs, { withFileTypes: true }); } catch (e) { return results; }
+  for (const ent of entries) {
+    if (ent.name.startsWith('.')) continue;
+    if (_SKIP_DIRS.includes(ent.name)) continue;
+    const rel = relDir ? `${relDir}/${ent.name}` : ent.name;
+    if (ent.isDirectory()) {
+      results.push(..._collectAppFiles(rel, depth + 1));
+    } else {
+      const ext = path.extname(ent.name).toLowerCase();
+      if (_CODE_EXTENSIONS.includes(ext) && !ent.name.endsWith('.map')) {
+        try { results.push({ path: rel, size: fs.statSync(_safeResolve(rel)).size || 0 }); } catch (e) {}
+      }
+    }
+  }
+  return results;
+}
+
+async function listAppFiles(args) {
+  const keyword = (args?.keyword || '').toLowerCase();
+  const limit = parseInt(args?.limit) || 200;
+  const files = _collectAppFiles('');
+  let filtered = keyword ? files.filter(f => f.path.toLowerCase().includes(keyword)) : files;
+  filtered.sort((a, b) => a.path.localeCompare(b.path));
+  const shown = filtered.slice(0, limit);
+  return {
+    success: true,
+    message: `共 ${filtered.length} 个匹配文件，显示前 ${shown.length} 个：\n` +
+      shown.map(f => `- ${f.path} (${f.size} 字节)`).join('\n') +
+      (filtered.length > shown.length ? `\n... 还有 ${filtered.length - shown.length} 个` : '')
+  };
+}
+
+async function readAppFile(args) {
+  const rel = (args?.path || '').replace(/\\/g, '/');
+  if (!rel) return { success: false, message: '缺少 path 参数' };
+  const abs = _safeResolve(rel);
+  if (!abs) return { success: false, message: '路径越权：只能读取 resources/app 内的文件' };
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+    return { success: false, message: `文件不存在: ${rel}` };
+  }
+  const stat = fs.statSync(abs);
+  if (stat.size > 200 * 1024) {
+    return { success: false, message: `文件过大 (${(stat.size / 1024).toFixed(0)}KB)，请先用 searchAppCode 定位具体内容` };
+  }
+  const lines = fs.readFileSync(abs, 'utf-8').split('\n');
+  const lineCount = parseInt(args?.lineCount) || 300;
+  const truncated = lines.length > lineCount;
+  const content = lines.slice(0, lineCount).join('\n');
+  return {
+    success: true,
+    message: `📄 ${rel}（共 ${lines.length} 行${truncated ? `，显示前 ${lineCount} 行` : ''}）：\n\`\`\`\n${content}\n\`\`\``
+  };
+}
+
+async function searchAppCode(args) {
+  const keyword = (args?.keyword || '').trim();
+  const limit = parseInt(args?.limit) || 20;
+  if (!keyword) return { success: false, message: '缺少 keyword 参数' };
+  const files = _collectAppFiles('');
+  const hits = [];
+  for (const f of files) {
+    if (f.size > 500 * 1024) continue;
+    try {
+      const lines = fs.readFileSync(_safeResolve(f.path), 'utf-8').split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
+          hits.push(`${f.path}:${i + 1}: ${lines[i].trim().slice(0, 120)}`);
+          if (hits.length >= limit * 2) break;
+        }
+      }
+    } catch (e) {}
+    if (hits.length >= limit * 2) break;
+  }
+  const shown = hits.slice(0, limit);
+  return {
+    success: true,
+    message: `🔍 搜索 "${keyword}"：命中 ${hits.length} 处${shown.length < hits.length ? `，显示前 ${shown.length} 处` : ''}：\n` +
+      (shown.join('\n') || '(无匹配)')
+  };
+}
+
+async function runNodeCheck(args) {
+  const rel = (args?.path || '').replace(/\\/g, '/');
+  if (!rel) return { success: false, message: '缺少 path 参数' };
+  if (!rel.endsWith('.js')) return { success: false, message: '仅支持 .js 文件语法检查' };
+  const abs = _safeResolve(rel);
+  if (!abs) return { success: false, message: '路径越权' };
+  if (!fs.existsSync(abs)) return { success: false, message: `文件不存在: ${rel}` };
+  try {
+    execSync(`node --check "${abs}"`, { timeout: 15000, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+    return { success: true, message: `✅ ${rel} 语法检查通过` };
+  } catch (e) {
+    return { success: false, message: `❌ ${rel} 语法错误：\n${(e.stderr || e.message || '').slice(0, 500)}` };
+  }
+}
+
+const _WRITE_BLACKLIST = ['xilian-agent.js', 'main.js', 'data.json'];
+
+async function writeAppFile(args) {
+  const rel = (args?.path || '').replace(/\\/g, '/');
+  const content = args?.content;
+  const changeNote = args?.changeNote || '';
+  if (!rel) return { success: false, message: '缺少 path 参数' };
+  if (content === undefined || content === null) return { success: false, message: '缺少 content 参数' };
+  if (content.length > 2 * 1024 * 1024) return { success: false, message: '内容过大（>2MB）' };
+  const baseName = path.basename(rel);
+  if (_WRITE_BLACKLIST.includes(baseName)) {
+    return { success: false, message: `❌ 禁止修改 ${baseName}（引擎/入口/数据文件），请改用 updateAgentRules 调整行为，或让人类用外部工具修改` };
+  }
+  const abs = _safeResolve(rel);
+  if (!abs) return { success: false, message: '路径越权：只能修改 resources/app 内的文件' };
+  // .js 语法检查（先写临时文件验证，通过才真正写入）
+  if (rel.endsWith('.js')) {
+    const tmpPath = abs + '.ai-check-tmp';
+    try {
+      fs.writeFileSync(tmpPath, content, 'utf-8');
+      execSync(`node --check "${tmpPath}"`, { timeout: 15000, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+      fs.unlinkSync(tmpPath);
+    } catch (e) {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      return { success: false, message: `❌ 语法检查未通过，未写入任何内容：\n${(e.stderr || e.message || '').slice(0, 500)}` };
+    }
+  }
+  // 备份原文件到 ai-config/.backups
+  try {
+    const backupDir = path.join(_getAppDir(), 'ai-config', '.backups');
+    fs.mkdirSync(backupDir, { recursive: true });
+    if (fs.existsSync(abs)) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      fs.copyFileSync(abs, path.join(backupDir, `${stamp}-${baseName}.bak`));
+    }
+  } catch (e) {
+    safeLog(`[昔涟] 备份失败(继续): ${e.message}`);
+  }
+  // 写入
+  fs.writeFileSync(abs, content, 'utf-8');
+  safeLog(`[昔涟] 自我迭代: 已修改 ${rel}（${changeNote}）`);
+  return {
+    success: true,
+    message: `✅ 已修改 ${rel}（${changeNote}）\n原文件备份在 ai-config/.backups/\n⚠️ 修改后需要重启 Elysia 才能生效（若该文件已被加载）。`
+  };
+}
+
+async function updateAgentRules(args) {
+  const content = args?.content;
+  const changeNote = args?.changeNote || '';
+  if (content === undefined || content === null) return { success: false, message: '缺少 content 参数' };
+  if (content.length > 100 * 1024) return { success: false, message: '规则内容过大（>100KB）' };
+  const dir = path.join(_getAppDir(), 'ai-config');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'agent-rules.md'), content, 'utf-8');
+  safeLog(`[昔涟] 行为规则已更新: ${changeNote}`);
+  return { success: true, message: `✅ 行为规则已更新（${changeNote}）\n下次对话自动生效。` };
+}
+
+// ============================================================
 // MODULE EXPORTS
 // ============================================================
 module.exports = {
@@ -1634,5 +1930,7 @@ module.exports = {
   createBudget, updateBudget, listBudgets, getBudgetStatus,
   getSettings, updateSettings, switchUser,
   triggerSync, getSyncStatus,
-  getDashboard
+  getDashboard,
+  // ★ 自我迭代工具
+  listAppFiles, readAppFile, searchAppCode, runNodeCheck, writeAppFile, updateAgentRules
 };
