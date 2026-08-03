@@ -131,11 +131,15 @@ class SettingsManager {
       this.savedTaskOpacity = settings.taskCardOpacity || '80';
       this.savedExpenseOpacity = settings.expenseCardOpacity || '80';
       this.savedFinanceOpacity = settings.financeCardOpacity || '80';
+      this.savedReminderOpacity = settings.reminderCardOpacity || '80';
+      this.savedMemoOpacity = settings.memoCardOpacity || '80';
     } catch {
       this.savedTheme = 'light';
       this.savedTaskOpacity = '80';
       this.savedExpenseOpacity = '80';
       this.savedFinanceOpacity = '80';
+      this.savedReminderOpacity = '80';
+      this.savedMemoOpacity = '80';
     }
     
     try {
@@ -179,6 +183,10 @@ class SettingsManager {
     document.getElementById('expenseCardOpacityValue').textContent = this.savedExpenseOpacity + '%';
     document.getElementById('financeCardOpacity').value = this.savedFinanceOpacity;
     document.getElementById('financeCardOpacityValue').textContent = this.savedFinanceOpacity + '%';
+    document.getElementById('reminderCardOpacity').value = this.savedReminderOpacity;
+    document.getElementById('reminderCardOpacityValue').textContent = this.savedReminderOpacity + '%';
+    document.getElementById('memoCardOpacity').value = this.savedMemoOpacity;
+    document.getElementById('memoCardOpacityValue').textContent = this.savedMemoOpacity + '%';
     this.appController.themeManager.applyCardOpacity();
     
     const autoSyncToggle = document.getElementById('autoSyncToggle');
@@ -200,6 +208,8 @@ class SettingsManager {
     const calendarOpacity = document.getElementById('calendarOpacity').value;
     const budgetOpacity = document.getElementById('budgetOpacity').value;
     const secretOpacity = document.getElementById('secretCardOpacity').value;
+    const reminderOpacity = document.getElementById('reminderCardOpacity').value;
+    const memoOpacity = document.getElementById('memoCardOpacity').value;
     
     const themeManager = this.appController.themeManager;
     const darkBackgroundImage = themeManager.savedDarkBackgroundImage || '';
@@ -220,6 +230,15 @@ class SettingsManager {
     const lightOverlayOpacity = document.getElementById('lightOverlayOpacity').value;
     const lightInvert = document.querySelector('input[name="lightInvert"]:checked').value;
     
+    const chatBackgroundImage = themeManager.savedChatBackgroundImage || '';
+    const chatBackgroundPositionX = document.getElementById('chatBackgroundPositionX').value;
+    const chatBackgroundPositionY = document.getElementById('chatBackgroundPositionY').value;
+    const chatBackgroundSizeWidth = document.getElementById('chatBackgroundSizeWidth').value;
+    const chatBackgroundOpacity = document.getElementById('chatBackgroundOpacity').value;
+    const chatBackgroundBlur = document.getElementById('chatBackgroundBlur').value;
+    const chatOverlayColor = document.getElementById('chatOverlayColor').value;
+    const chatOverlayOpacity = document.getElementById('chatOverlayOpacity').value;
+    
     try {
       // 一次性收集所有设置（界面 + Elysia AI），合并保存
       XilianSettings._syncFormToPreset();
@@ -235,12 +254,16 @@ class SettingsManager {
         taskCardOpacity: taskOpacity, expenseCardOpacity: expenseOpacity,
         financeCardOpacity: financeOpacity, calendarOpacity: calendarOpacity,
         budgetOpacity: budgetOpacity, secretCardOpacity: secretOpacity,
+        reminderCardOpacity: reminderOpacity, memoCardOpacity: memoOpacity,
         darkBackgroundImage: darkBackgroundImage ? encodeURIComponent(darkBackgroundImage) : '',
         darkBackgroundPositionX, darkBackgroundPositionY, darkBackgroundSizeWidth,
         darkBackgroundOpacity, darkOverlayColor, darkOverlayOpacity, darkInvert,
         lightBackgroundImage: lightBackgroundImage ? encodeURIComponent(lightBackgroundImage) : '',
         lightBackgroundPositionX, lightBackgroundPositionY, lightBackgroundSizeWidth,
         lightBackgroundOpacity, lightOverlayColor, lightOverlayOpacity, lightInvert,
+        chatBackgroundImage: chatBackgroundImage ? encodeURIComponent(chatBackgroundImage) : '',
+        chatBackgroundPositionX, chatBackgroundPositionY, chatBackgroundSizeWidth,
+        chatBackgroundOpacity, chatBackgroundBlur, chatOverlayColor, chatOverlayOpacity,
         ...elysiaConfig,
         aiPresets: XilianSettings._presets,
         aiCurrentPresetId: XilianSettings._currentPresetId
@@ -252,13 +275,18 @@ class SettingsManager {
       themeManager.savedCalendarOpacity = calendarOpacity;
       themeManager.savedBudgetOpacity = budgetOpacity;
       themeManager.savedSecretOpacity = secretOpacity;
+      themeManager.savedReminderOpacity = reminderOpacity;
+      themeManager.savedMemoOpacity = memoOpacity;
       themeManager.applyBackgroundSettings();
       themeManager.applyCardOpacity();
+      themeManager.applyChatBackground();
       
       this.savedTheme = themeMode;
       this.savedTaskOpacity = taskOpacity;
       this.savedExpenseOpacity = expenseOpacity;
       this.savedFinanceOpacity = financeOpacity;
+      this.savedReminderOpacity = reminderOpacity;
+      this.savedMemoOpacity = memoOpacity;
       
       const modal = document.getElementById('settingsModal');
       modal.classList.remove('show');

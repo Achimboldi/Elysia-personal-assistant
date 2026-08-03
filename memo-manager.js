@@ -48,7 +48,7 @@ class MemoManager {
       return result;
     } catch (error) {
       console.error('[MemoManager] 保存备忘录失败:', error);
-      return { success: false, message: '保存备忘录失败: ' + error.message };
+    return { success: false, message: '保存笔记失败: ' + error.message };
     }
   }
 
@@ -67,7 +67,7 @@ class MemoManager {
       return result;
     } catch (error) {
       console.error('[MemoManager] 删除备忘录失败:', error);
-      return { success: false, message: '删除备忘录失败: ' + error.message };
+    return { success: false, message: '删除笔记失败: ' + error.message };
     }
   }
 

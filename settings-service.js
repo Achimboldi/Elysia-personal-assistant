@@ -358,6 +358,8 @@ function setupSettingsServiceIpc() {
       calendarOpacity: data.settings.calendarOpacity,
       budgetOpacity: data.settings.budgetOpacity,
       secretCardOpacity: data.settings.secretCardOpacity,
+      reminderCardOpacity: data.settings.reminderCardOpacity,
+      memoCardOpacity: data.settings.memoCardOpacity,
       darkBackgroundImage: data.settings.darkBackgroundImage,
       darkBackgroundPositionX: data.settings.darkBackgroundPositionX,
       darkBackgroundPositionY: data.settings.darkBackgroundPositionY,
@@ -373,7 +375,15 @@ function setupSettingsServiceIpc() {
       lightBackgroundOpacity: data.settings.lightBackgroundOpacity,
       lightOverlayColor: data.settings.lightOverlayColor,
       lightOverlayOpacity: data.settings.lightOverlayOpacity,
-      lightInvert: data.settings.lightInvert
+      lightInvert: data.settings.lightInvert,
+      chatBackgroundImage: data.settings.chatBackgroundImage,
+      chatBackgroundPositionX: data.settings.chatBackgroundPositionX,
+      chatBackgroundPositionY: data.settings.chatBackgroundPositionY,
+      chatBackgroundSizeWidth: data.settings.chatBackgroundSizeWidth,
+      chatBackgroundOpacity: data.settings.chatBackgroundOpacity,
+      chatBackgroundBlur: data.settings.chatBackgroundBlur,
+      chatOverlayColor: data.settings.chatOverlayColor,
+      chatOverlayOpacity: data.settings.chatOverlayOpacity
     };
 
     const mergedSettings = { ...preservedSettings, ...newSettings };

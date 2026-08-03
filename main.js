@@ -1030,7 +1030,7 @@ function setupIpcHandlers() {
       }
       return { success: writeResult.success, memo: data.memos[index], message: writeResult.message };
     }
-    return { success: false, memo: null, message: '未找到备忘录' };
+    return { success: false, memo: null, message: '未找到笔记' };
   });
 
   ipcMain.handle('toggle-private-memo', async (event, memoId) => {
@@ -1048,7 +1048,7 @@ function setupIpcHandlers() {
       }
       return { success: writeResult.success, memo: data.memos[index], message: writeResult.message };
     }
-    return { success: false, memo: null, message: '未找到备忘录' };
+    return { success: false, memo: null, message: '未找到笔记' };
   });
 
   ipcMain.handle('save-memo-order', async (event, orderedMemos) => {
@@ -1139,11 +1139,11 @@ function setupIpcHandlers() {
       const data = readData();
       const memo = data.memos.find(m => String(m.id) === String(memoId));
       if (!memo) {
-        return { success: false, error: '未找到备忘录' };
+        return { success: false, error: '未找到笔记' };
       }
 
       const { dialog } = require('electron');
-      const title = memo.title || '备忘录';
+      const title = memo.title || '笔记';
       const content = `标题：${title}\n\n${memo.content || ''}`;
       
       const result = await dialog.showSaveDialog(mainWindow, {
@@ -1169,11 +1169,11 @@ function setupIpcHandlers() {
       const data = readData();
       const memo = data.memos.find(m => String(m.id) === String(memoId));
       if (!memo) {
-        return { success: false, error: '未找到备忘录' };
+        return { success: false, error: '未找到笔记' };
       }
 
       const { dialog } = require('electron');
-      const title = memo.title || '备忘录';
+      const title = memo.title || '笔记';
       
       const result = await dialog.showSaveDialog(mainWindow, {
         title: '保存DOCX文件',
@@ -4171,7 +4171,7 @@ ipcMain.handle('cloud-sync-check', async () => {
 
       return { 
         success: true, 
-        message: `导入成功！\n任务: ${importedData.tasks?.length || 0} 条\n备忘录: ${importedData.memos?.length || 0} 条\n收支: ${importedData.expenses?.length || 0} 条\n预算: ${importedData.budgets?.length || 0} 条\n密钥: ${importedData.secrets?.length || 0} 条\n日志: ${importedData.journals?.length || 0} 条`
+        message: `导入成功！\n任务: ${importedData.tasks?.length || 0} 条\n笔记: ${importedData.memos?.length || 0} 条\n收支: ${importedData.expenses?.length || 0} 条\n预算: ${importedData.budgets?.length || 0} 条\n密钥: ${importedData.secrets?.length || 0} 条\n日志: ${importedData.journals?.length || 0} 条`
       };
     } catch (e) {
       safeError('导入数据失败:', e);
@@ -4566,6 +4566,8 @@ ipcMain.handle('cloud-sync-check', async () => {
       calendarOpacity: data.settings.calendarOpacity,
       budgetOpacity: data.settings.budgetOpacity,
       secretCardOpacity: data.settings.secretCardOpacity,
+      reminderCardOpacity: data.settings.reminderCardOpacity,
+      memoCardOpacity: data.settings.memoCardOpacity,
       darkBackgroundImage: data.settings.darkBackgroundImage,
       darkBackgroundPositionX: data.settings.darkBackgroundPositionX,
       darkBackgroundPositionY: data.settings.darkBackgroundPositionY,
@@ -4582,6 +4584,14 @@ ipcMain.handle('cloud-sync-check', async () => {
       lightOverlayColor: data.settings.lightOverlayColor,
       lightOverlayOpacity: data.settings.lightOverlayOpacity,
       lightInvert: data.settings.lightInvert,
+      chatBackgroundImage: data.settings.chatBackgroundImage,
+      chatBackgroundPositionX: data.settings.chatBackgroundPositionX,
+      chatBackgroundPositionY: data.settings.chatBackgroundPositionY,
+      chatBackgroundSizeWidth: data.settings.chatBackgroundSizeWidth,
+      chatBackgroundOpacity: data.settings.chatBackgroundOpacity,
+      chatBackgroundBlur: data.settings.chatBackgroundBlur,
+      chatOverlayColor: data.settings.chatOverlayColor,
+      chatOverlayOpacity: data.settings.chatOverlayOpacity,
       // 🆕 昔涟 AI 配置（保护不被前端覆盖）
       aiProvider: data.settings.aiProvider,
       aiApiKey: data.settings.aiApiKey,

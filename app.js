@@ -122,8 +122,8 @@ class AppController {
   }
 
   async onDOMReady() {
-    // ★ 最优先：立即切换到昔涟视图（同步执行，保证 UI 立即可见）
-    try { this.switchView('xilian'); } catch (e) { console.error('[onDOMReady] switchView 失败:', e); }
+    // ★ 最优先：立即切换到笔记视图（同步执行，保证 UI 立即可见；聊天面板常驻右侧）
+    try { this.switchView('memos'); } catch (e) { console.error('[onDOMReady] switchView 失败:', e); }
 
     // ── 步骤1：加载全部数据（直读 data.json，不依赖 IPC）──
     try { await this.loadAllData(); } catch (e) { console.error('[onDOMReady] loadAllData 失败:', e); }
@@ -216,8 +216,10 @@ class AppController {
     // ── 步骤8.5：初始化提醒模块（列表/表单/角标；调度器由主进程负责）──
     try { this.reminderUI.init(); } catch (e) { console.error('[onDOMReady] reminderUI.init 失败:', e); }
 
-    // 兜底：确保视图正确
-    this.switchView('xilian');
+    // 兜底：确保视图正确（默认笔记视图）
+    this.switchView('memos');
+    // 聊天面板常驻右侧：启动时加载一次聊天历史并滚动到底部（不再随视图切换触发，避免抢焦点）
+    try { await this.xilianManager.onViewActivated(); } catch (e) { console.warn('[onDOMReady] 聊天激活失败:', e); }
 
     // ★ 关闭前保存聊天室状态（防止直接点 X 关闭窗口时状态丢失）
     window.addEventListener('beforeunload', () => {
@@ -1066,6 +1068,10 @@ class AppController {
     const clearBtn = document.getElementById('xilianClearHistoryBtn');
     const sendIcon = document.querySelector('.xilian-send-icon');
     const stopIcon = document.querySelector('.xilian-stop-icon');
+
+    // 聊天常驻右侧：与聊天交互（发送/聚焦输入框）时隐藏提醒触发红点
+    const notifyDot = document.getElementById('xilianNotifyDot');
+    const hideNotifyDot = () => { if (notifyDot) notifyDot.style.display = 'none'; };
     
     if (sendBtn && input) {
       const send = () => {
@@ -1076,6 +1082,7 @@ class AppController {
         }
         const text = input.value.trim();
         if (text) {
+          hideNotifyDot();
           input.value = '';
           input.style.height = 'auto';
           this.xilianManager.sendMessage(text);
@@ -1089,6 +1096,8 @@ class AppController {
           send();
         }
       });
+      input.addEventListener('focus', hideNotifyDot);
+      input.addEventListener('click', hideNotifyDot);
       
       // 自动调整输入框高度
       input.addEventListener('input', () => {
@@ -2229,9 +2238,10 @@ class AppController {
     if (navTarget) navTarget.classList.add('active');
     else console.warn('[switchView] nav item not found for', view);
 
-    // 显式控制所有 view-panel 的显示/隐藏
+    // 显式控制所有 view-panel 的显示/隐藏（右侧常驻聊天面板 #xilianView 不参与切换）
     const viewPanels = document.querySelectorAll('.view-panel');
     viewPanels.forEach(panel => {
+      if (panel.id === 'xilianView') return;
       panel.classList.remove('active');
       panel.style.display = 'none';
     });
@@ -2256,14 +2266,15 @@ class AppController {
       addSecretBtn.style.display = view === 'secrets' ? 'flex' : 'none';
     }
 
-    // 昔涟 / 星图视图时隐藏日期导航和右侧财务面板（星图独占整块区域）
+    // 笔记 / 星图视图时隐藏日期导航（笔记自带标题栏）
     const panelHeader = document.querySelector('.panel-header');
     if (panelHeader) {
-      panelHeader.style.display = (view === 'xilian' || view === 'memory') ? 'none' : '';
+      panelHeader.style.display = (view === 'memos' || view === 'memory') ? 'none' : '';
     }
+    // 财务状况板块仅收支视图显示，其余视图隐藏并让内容区占满
     const financeSection = document.querySelector('.finance-section');
     if (financeSection) {
-      financeSection.style.display = (view === 'xilian' || view === 'memory') ? 'none' : '';
+      financeSection.style.display = view === 'expenses' ? '' : 'none';
     }
 
     // 星图模式：让 .main-content 独占除左侧导航外的整个区域
@@ -2281,13 +2292,6 @@ class AppController {
       this.loadJournalForDate(this.selectedDateStr);
     }
     
-    if (view === 'xilian') {
-      // ★ 进入昔涟视图时隐藏提醒触发红点（元素不存在时容错）
-      const notifyDot = document.getElementById('xilianNotifyDot');
-      if (notifyDot) notifyDot.style.display = 'none';
-      this.xilianManager.onViewActivated();
-    }
-
     // 星图面板：首次显示时触发 canvas resize（MC main.js 已监听 window resize）
     if (view === 'memory') {
       // ★ 打开星图时刷新 AI 主星名（兜底：即便之前没触发，也能保证星图显示当前智能体）
@@ -2555,7 +2559,7 @@ class AppController {
     };
 
     await this.memoManager.saveMemo(memo);
-    alert('财务报告已生成并保存到备忘录！');
+    alert('财务报告已生成并保存到笔记！');
   }
 
   setupWindowControls() {
@@ -3137,6 +3141,16 @@ class AppController {
       document.getElementById('secretCardOpacityValue').textContent = e.target.value + '%';
       this.themeManager.previewCardOpacity();
     });
+
+    document.getElementById('reminderCardOpacity').addEventListener('input', (e) => {
+      document.getElementById('reminderCardOpacityValue').textContent = e.target.value + '%';
+      this.themeManager.previewCardOpacity();
+    });
+
+    document.getElementById('memoCardOpacity').addEventListener('input', (e) => {
+      document.getElementById('memoCardOpacityValue').textContent = e.target.value + '%';
+      this.themeManager.previewCardOpacity();
+    });
     
     document.getElementById('selectDarkBackgroundBtn').addEventListener('click', () => {
       document.getElementById('darkBackgroundImageInput').click();
@@ -3357,6 +3371,58 @@ class AppController {
       });
     });
     
+    document.getElementById('selectChatBackgroundBtn').addEventListener('click', () => {
+      document.getElementById('chatBackgroundImageInput').click();
+    });
+
+    document.getElementById('chatBackgroundImageInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        let imagePath = file.path;
+        imagePath = imagePath.replace(/\\/g, '/');
+        this.themeManager.savedChatBackgroundImage = imagePath;
+        this.themeManager.applyChatBackground();
+        document.getElementById('chatCurrentBackgroundPath').textContent = file.path;
+        this.themeManager.saveBackgroundSettings();
+      }
+    });
+
+    document.getElementById('clearChatBackgroundBtn').addEventListener('click', () => {
+      this.themeManager.savedChatBackgroundImage = '';
+      this.themeManager.applyChatBackground();
+      document.getElementById('chatCurrentBackgroundPath').textContent = '未设置背景图';
+      document.getElementById('chatBackgroundImageInput').value = '';
+      this.themeManager.saveBackgroundSettings();
+    });
+
+    [
+      ['chatBackgroundPositionX', 'chatBackgroundPositionXValue', 'savedChatBackgroundPositionX'],
+      ['chatBackgroundPositionY', 'chatBackgroundPositionYValue', 'savedChatBackgroundPositionY'],
+      ['chatBackgroundSizeWidth', 'chatBackgroundSizeWidthValue', 'savedChatBackgroundSizeWidth'],
+      ['chatBackgroundOpacity', 'chatBackgroundOpacityValue', 'savedChatBackgroundOpacity'],
+      ['chatBackgroundBlur', 'chatBackgroundBlurValue', 'savedChatBackgroundBlur']
+    ].forEach(([id, labelId, savedKey]) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        this.themeManager[savedKey] = e.target.value;
+        document.getElementById(labelId).textContent = e.target.value + (id === 'chatBackgroundBlur' ? 'px' : '%');
+        this.themeManager.applyChatBackground();
+        this.themeManager.saveBackgroundSettings();
+      });
+    });
+
+    document.getElementById('chatOverlayColor').addEventListener('input', (e) => {
+      this.themeManager.savedChatOverlayColor = e.target.value;
+      this.themeManager.applyChatBackground();
+      this.themeManager.saveBackgroundSettings();
+    });
+
+    document.getElementById('chatOverlayOpacity').addEventListener('input', (e) => {
+      this.themeManager.savedChatOverlayOpacity = e.target.value;
+      document.getElementById('chatOverlayOpacityValue').textContent = e.target.value + '%';
+      this.themeManager.applyChatBackground();
+      this.themeManager.saveBackgroundSettings();
+    });
+
     document.querySelectorAll('input[name="themeMode"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         this.themeManager.previewThemeChange(e.target.value === 'dark');
@@ -3562,7 +3628,7 @@ class AppController {
           <span class="backup-item-badge ${typeClass}">${typeLabel}</span>
         </div>
         <div class="backup-item-body">
-          <span class="backup-stat-item">备忘录: <span class="backup-stat-value">${backup.memoCount}</span></span>
+          <span class="backup-stat-item">笔记: <span class="backup-stat-value">${backup.memoCount}</span></span>
           <span class="backup-stat-divider">|</span>
           <span class="backup-stat-item">任务: <span class="backup-stat-value">${backup.taskCount}</span></span>
           <span class="backup-stat-divider">|</span>
@@ -5711,24 +5777,24 @@ class AppController {
 
   setupDragAndDrop() {
     const memoContainer = document.getElementById('memosContainer');
-    const rightPanel = document.querySelector('.right-panel');
+    const memoView = document.getElementById('memosView');
 
     const handleDragOver = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      rightPanel.classList.add('drag-over');
+      memoView.classList.add('drag-over');
     };
 
     const handleDragLeave = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      rightPanel.classList.remove('drag-over');
+      memoView.classList.remove('drag-over');
     };
 
     const handleDrop = async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      rightPanel.classList.remove('drag-over');
+      memoView.classList.remove('drag-over');
 
       const files = e.dataTransfer.files;
       let successCount = 0;
@@ -5762,9 +5828,9 @@ class AppController {
       }
     };
 
-    rightPanel.addEventListener('dragover', handleDragOver);
-    rightPanel.addEventListener('dragleave', handleDragLeave);
-    rightPanel.addEventListener('drop', handleDrop);
+    memoView.addEventListener('dragover', handleDragOver);
+    memoView.addEventListener('dragleave', handleDragLeave);
+    memoView.addEventListener('drop', handleDrop);
   }
 
   initTaskTags() {
@@ -5825,11 +5891,11 @@ class AppController {
     if (!toggleBtn) return;
     
     if (this.showPrivateMemos) {
-      toggleBtn.textContent = '🔒 私密备忘录';
-      toggleBtn.title = '显示公开备忘录';
+      toggleBtn.textContent = '🔒 私密笔记';
+      toggleBtn.title = '显示公开笔记';
     } else {
-      toggleBtn.textContent = '备忘录';
-      toggleBtn.title = '显示私密备忘录';
+      toggleBtn.textContent = '笔记';
+      toggleBtn.title = '显示私密笔记';
     }
     
     // 清理编辑状态
@@ -7327,12 +7393,12 @@ class AppController {
       let html = filteredMemos.map(memo => this.createMemoCard(memo)).join('');
 
       const emptyText = this.showPrivateMemos 
-        ? `<div class="empty-state"><h2>还没有私密备忘录</h2><p>点击备忘录的菜单，设为私密</p></div>`
-        : `<div class="empty-state"><h2>还没有备忘录</h2><p>点击"新建备忘"记录你的想法吧！</p></div>`;
+        ? `<div class="empty-state"><h2>还没有私密笔记</h2><p>点击笔记的菜单，设为私密</p></div>`
+        : `<div class="empty-state"><h2>还没有笔记</h2><p>点击"新建笔记"记录你的想法吧！</p></div>`;
 
       if (filteredMemos.length === 0) {
         html = this.searchKeyword 
-          ? `<div class="empty-state"><h2>未找到匹配的备忘录</h2><p>试试其他搜索词</p></div>`
+          ? `<div class="empty-state"><h2>未找到匹配的笔记</h2><p>试试其他搜索词</p></div>`
           : emptyText;
       }
 
@@ -7351,7 +7417,7 @@ class AppController {
       preview = preview.substring(0, 150) + '...';
     }
     
-    let title = memo.title || '备忘';
+    let title = memo.title || '笔记';
     
     // 搜索高亮
     if (this.searchKeyword) {
@@ -7483,7 +7549,7 @@ class AppController {
                 ipcRenderer.invoke('mc:ingest-memo', memo).catch(() => {});
               }
             } else {
-              alert('保存备忘录失败: ' + saveResult.message);
+              alert('保存笔记失败: ' + saveResult.message);
             }
           }
         }
@@ -9202,7 +9268,7 @@ class AppController {
         const content = (memo.content || '').toLowerCase();
         if (title.includes(lowerKeyword) || content.includes(lowerKeyword)) {
           results.push({
-            type: 'memo', typeLabel: '备忘录', id: memo.id,
+            type: 'memo', typeLabel: '笔记', id: memo.id,
             title: memo.title || '无标题',
             preview: memo.content ? memo.content.substring(0, 80) : '',
             data: memo
@@ -9340,6 +9406,7 @@ class AppController {
         this.openEditModal(id, 'task');
       }
     } else if (type === 'memo') {
+      this.switchView('memos');
       this.openEditModal(id, 'memo');
     } else if (type === 'secret') {
       this.switchView('secrets');
@@ -9491,7 +9558,7 @@ const MenuManager = (() => {
           if (result.success) {
             window.appController.renderMemos();
           } else {
-            alert('保存备忘录失败: ' + result.message);
+              alert('保存笔记失败: ' + result.message);
           }
         }
         break;
@@ -9525,7 +9592,7 @@ const MenuManager = (() => {
             const result = await window.appController.memoManager.deleteMemo(id);
             deleteSuccess = result.success;
             if (!deleteSuccess) {
-              alert('删除备忘录失败: ' + result.message);
+              alert('删除笔记失败: ' + result.message);
             }
           } else {
             const result = await window.appController.expenseManager.deleteExpense(id);

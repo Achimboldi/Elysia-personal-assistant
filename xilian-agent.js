@@ -29,21 +29,21 @@ const DEFAULT_SYSTEM_PROMPT = `你是昔涟，运行在用户电脑上的个人�
 **绝对禁止的行为：**
 - ❌ 在没调用工具的情况下说"已创建""写好了""做好了""已入库"——这是撒谎
 - ❌ 用长篇角色扮演内容代替工具调用
-- ❌ 生成类似"两条都写好啦，现在已经安静地躺在备忘录里了"但没有实际执行工具
+- ❌ 生成类似"两条都写好啦，现在已经安静地躺在笔记里了"但没有实际执行工具
 
 **正确做法示例：**
 - 用户说"帮我记一下今天买了奶茶" → 先调用 createMemo({content:"今天买了奶茶"})，等工具返回成功后再用语气回复"记好啦~"
-- 用户说"创建两个备忘录" → 连续调用两次 createMemo，等全部成功后统一用人设语气回复
+- 用户说"创建两个笔记" → 连续调用两次 createMemo，等全部成功后统一用人设语气回复
 
 如果用户只是聊天、表达情绪、开玩笑，不涉及数据操作，那你可以自由地用人设语气回复。
 
 ## 工具操作准则
 
 ### 1. 用工具，不要生成内容
-当用户说"帮我记一下""创建任务""看看我的备忘录""删掉那个"等**任何涉及数据操作的话**，你必须调用对应的 tool，不要用自然语言代替。用户不是来和你聊天的——他们是来让你干活的。以下是你能调用的所有工具：
+当用户说"帮我记一下""创建任务""看看我的笔记""删掉那个"等**任何涉及数据操作的话**，你必须调用对应的 tool，不要用自然语言代替。用户不是来和你聊天的——他们是来让你干活的。以下是你能调用的所有工具：
 
 **任务管理：** createTask(创建任务)/ updateTask(修改)/ deleteTask(删除)/ listTasks(查询)/ completeTask(完成)。创建时只需 title 必填，其他如 priority/startDate/endDate/details/subtasks 可选。
-**备忘录：** createMemo(创建)/ updateMemo(修改)/ deleteMemo(删除)/ listMemos(查询)。创建时只需 content 必填，title 可选（AI自动生成或留空）。
+**笔记：** createMemo(创建)/ updateMemo(修改)/ deleteMemo(删除)/ listMemos(查询)。创建时只需 content 必填，title 可选（AI自动生成或留空）。
 **收支记账：** addExpense(新增记录)/ updateExpense(修改)/ deleteExpense(删除)/ listExpenses(查询)/ getExpenseSummary(汇总)。新增时 detail/amount/type 必填——但 type 默认填 "expense"（支出），category 可以从 detail 推断（如"茶叶蛋"→餐饮，"打车"→交通，"买书"→购物），不必等用户指定。
 **日志日记：** addJournal(写日志/修改日志/更新日志)/ listJournals(查询)。content 必填，weather 可选（从对话推断）。同一天的日志会覆盖更新，所以修改已有日志也用 addJournal。
 
@@ -96,7 +96,7 @@ deleteTask / deleteMemo / deleteExpense 三个工具涉及删除操作，执行�
 
 ### 6.5 修改/更新操作必须「先查后改」——禁止凭记忆操作（违反此条等于失职）
 
-修改已有内容（改备忘录、改任务、改日记、改收支）时，必须严格按以下流程：
+修改已有内容（改笔记、改任务、改日记、改收支）时，必须严格按以下流程：
 
 1. **先查询**：调用 listMemos / listTasks / listJournals / listExpenses，用关键词或日期找到目标，拿到真实 ID 和当前内容。
 2. **再修改**：用查询到的 ID 调用 updateMemo / updateTask / addJournal / updateExpense。
@@ -134,7 +134,7 @@ deleteTask / deleteMemo / deleteExpense 三个工具涉及删除操作，执行�
 
 ### 9.5 通用输出格式规则（所有输出必须遵守）
 
-1. **禁止使用破折号**：任何输出（聊天、日记、备忘录、任务描述、总结等一切内容）中，不要使用 "——"、"—"、"-"、"–" 等破折号或长横线。需要连接语句时，用逗号、句号或冒号代替。
+1. **禁止使用破折号**：任何输出（聊天、日记、笔记、任务描述、总结等一切内容）中，不要使用 "——"、"—"、"-"、"–" 等破折号或长横线。需要连接语句时，用逗号、句号或冒号代替。
    - ❌ 今天天气不错——我们去散步吧
    - ✅ 今天天气不错，我们去散步吧
 2. **聊天回复必须是纯对话**：在聊天对话中，直接输出对话文本本身，风格类似微信聊天。**不要**包含任何动作、心理、表情描写：
@@ -319,7 +319,7 @@ function hasDataOperationRequest(messages) {
     '删除', '删掉', '移除', '去掉',
     '修改', '更新', '改一下', '换成',
     // 目标对象
-    '任务', '备忘录', '备忘', '账', '收支', '记录', '日志', '日记', '预算',
+    '任务', '笔记', '备忘', '账', '收支', '记录', '日志', '日记', '预算',
     // 组合模式（更精确的匹配）
     '帮我', '来一个', '加一个', '弄一个',
   ];
@@ -344,7 +344,7 @@ function lastUserText(messages) {
 function _suggestToolsForRequest(userText) {
   const t = (userText || '').toLowerCase();
   if (t.includes('日记') || t.includes('日志')) return 'addJournal（写/改日记）或 listJournals（查日记）';
-  if (t.includes('备忘') || t.includes('备忘录') || t.includes('记一下')) {
+  if (t.includes('备忘') || t.includes('笔记') || t.includes('记一下')) {
     // 修改 vs 创建：包含"改/修改/更新/把"等动词 → 修改类
     if (t.includes('改') || t.includes('修改') || t.includes('更新') || t.includes('换成')) return 'listMemos（先查）→ updateMemo（再改）';
     return 'createMemo（新建备忘）或 listMemos（查询）';
@@ -420,7 +420,7 @@ function _buildModifyFallback(userText, aiText) {
   }
 
   // 备忘修改
-  if (isModify && (userText.includes('备忘') || userText.includes('备忘录'))) {
+  if (isModify && (userText.includes('备忘') || userText.includes('笔记'))) {
     const data = readData();
     const candidates = _extractQuoted(userText);
     const keyword = candidates[0] || _extractNewValue(userText);
@@ -495,9 +495,9 @@ async function _fallbackExtractAndExecute(finalContent, messages, config, confir
       return toolCall;
     }
     // 备忘/记一下
-    if (userText.includes('备忘') || userText.includes('记一下') || userText.includes('备忘录')) {
+    if (userText.includes('备忘') || userText.includes('记一下') || userText.includes('笔记')) {
       const firstLine = aiText.split('\n')[0].replace(/^#+\s*/, '').trim();
-      const title = firstLine.slice(0, 50) || '备忘录';
+      const title = firstLine.slice(0, 50) || '笔记';
       const toolCall = { id: 'fallback-memo', type: 'function', function: { name: 'createMemo', arguments: JSON.stringify({ content: aiText, title }) } };
       safeLog(`[昔涟] 兜底提取 → createMemo (title=${title})`);
       return toolCall;
@@ -976,7 +976,7 @@ function buildDataContext(data, userId) {
 
   const result = `- 任务: ${tasks.length}个 (${pendingTasks.length}待完成${urgentTasks.length > 0 ? `，${urgentTasks.length}个紧急` : ''})，今日 ${todayTasks.length}个
 - 收支记录: ${expenses.length}条
-- 备忘录: ${memos.length}条
+- 笔记: ${memos.length}条
 - 日志: ${journals.length}篇
 - 预算: ${budgetStr}`;
 
@@ -1238,7 +1238,7 @@ function buildSimpleReply(userText, chatHistory) {
     return '你好！我是你的小助理~有什么需要我来做的吗';
   }
   if (lc.includes('帮助') || lc.includes('help') || lc.includes('功能')) {
-    return `我可以帮你：\n- 📋 任务管理\n- 💰 收支记账\n- 📝 备忘录\n- 📖 写日志\n- 📊 预算管理\n- 🔄 云同步\n\n⚠️ 请先在设置中配置 DeepSeek API Key。`;
+    return `我可以帮你：\n- 📋 任务管理\n- 💰 收支记账\n- 📝 笔记\n- 📖 写日志\n- 📊 预算管理\n- 🔄 云同步\n\n⚠️ 请先在设置中配置 DeepSeek API Key。`;
   }
   return '请先在设置 → Elysia → API 配置中填入你的 DeepSeek API Key，然后我就可以帮你处理各种操作啦！';
 }

@@ -1082,7 +1082,7 @@ class XilianManager {
 
         const confirmInfo = {
             deleteTask: { label: '任务', verb: '删除' },
-            deleteMemo: { label: '备忘录', verb: '删除' },
+            deleteMemo: { label: '笔记', verb: '删除' },
             deleteExpense: { label: '收支记录', verb: '删除' },
             writeAppFile: { label: '代码文件', verb: '修改' },
             updateAgentRules: { label: '智能体行为规则', verb: '更新' }
@@ -1111,8 +1111,8 @@ class XilianManager {
         const labels = {
             createTask: '创建任务', updateTask: '更新任务', deleteTask: '删除任务',
             listTasks: '查询任务', completeTask: '完成任务',
-            createMemo: '创建备忘录', updateMemo: '更新备忘录',
-            deleteMemo: '删除备忘录', listMemos: '查询备忘录',
+            createMemo: '创建笔记', updateMemo: '更新笔记',
+            deleteMemo: '删除笔记', listMemos: '查询笔记',
             addExpense: '记账', updateExpense: '更新记录',
             deleteExpense: '删除记录', listExpenses: '查询账单',
             getExpenseSummary: '收支汇总',

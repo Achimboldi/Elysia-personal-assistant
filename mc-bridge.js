@@ -204,7 +204,7 @@ function initMC() {
                 if (memo.isPrivate) return false;
                 const title = memo.title.slice(0, 200);
                 const body = (memo.content || '').slice(0, 1500);
-                const content = `📝 备忘录《${title}》\n${body}\n（创建: ${memo.createdAt || '未知'} · 更新: ${memo.lastModified || memo.createdAt || '未知'}）`;
+                const content = `📝 笔记《${title}》\n${body}\n（创建: ${memo.createdAt || '未知'} · 更新: ${memo.lastModified || memo.createdAt || '未知'}）`;
                 const ok = ingestMessage(getDb(), {
                     sender: 'user',
                     content,
@@ -293,7 +293,7 @@ function initMC() {
                     if (!memo.title || !memo.content) continue;
                     const title = (memo.title || '').slice(0, 200);
                     const body = (memo.content || '').slice(0, 1500);
-                    const content = `📝 备忘录《${title}》\n${body}\n（创建: ${memo.createdAt || '未知'} · 更新: ${memo.lastModified || memo.createdAt || '未知'}）`;
+                    const content = `📝 笔记《${title}》\n${body}\n（创建: ${memo.createdAt || '未知'} · 更新: ${memo.lastModified || memo.createdAt || '未知'}）`;
                     const ts = memo.lastModified || memo.createdAt || new Date().toISOString();
                     const ok = ingestMessage(getDb(), { sender: 'user', content, timestamp: ts, messageType: 'text' });
                     if (ok) {
@@ -352,7 +352,7 @@ function initMC() {
                     if (memo.isPrivate || !memo.title || !memo.content) continue;
                     const body = (memo.content || '').slice(0, 1500);
                     const ts = memo.lastModified || memo.createdAt || new Date().toISOString();
-                    ingestMessage(getDb(), { sender: 'user', content: `📝 备忘录《${(memo.title||'').slice(0,200)}》\n${body}\n（更新: ${ts}）`, timestamp: ts, messageType: 'text' });
+                    ingestMessage(getDb(), { sender: 'user', content: `📝 笔记《${(memo.title||'').slice(0,200)}》\n${body}\n（更新: ${ts}）`, timestamp: ts, messageType: 'text' });
                     getDb().prepare("UPDATE messages SET source = 'memo' WHERE id = last_insert_rowid()").run();
                     memoCount++;
                 }
@@ -395,7 +395,7 @@ function initMC() {
                     if (memo.isPrivate || !memo.title || !memo.content) continue;
                     const body = (memo.content || '').slice(0, 1500);
                     const ts = memo.lastModified || memo.createdAt || new Date().toISOString();
-                    const content = `📝 备忘录《${(memo.title||'').slice(0,200)}》\n${body}\n（创建: ${memo.createdAt || '未知'} · 更新: ${ts}）`;
+                    const content = `📝 笔记《${(memo.title||'').slice(0,200)}》\n${body}\n（创建: ${memo.createdAt || '未知'} · 更新: ${ts}）`;
                     const ok = ingestMessage(db, { sender: 'user', content, timestamp: ts, messageType: 'text' });
                     if (ok) {
                         db.prepare("UPDATE messages SET source = 'memo' WHERE id = last_insert_rowid()").run();

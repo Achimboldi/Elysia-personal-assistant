@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elysia</title>
-    <link rel="stylesheet" href="styles.css?v=2026072704">
+    <link rel="stylesheet" href="styles.css?v=2026080303">
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 </head>
@@ -25,7 +25,7 @@
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input type="text" id="globalSearchInput" class="global-search-input" placeholder="搜索任务、备忘录、密钥、日志、收支..." autocomplete="off">
+                    <input type="text" id="globalSearchInput" class="global-search-input" placeholder="搜索任务、笔记、密钥、日志、收支..." autocomplete="off">
                     <div id="globalSearchResults" class="global-search-results" style="display:none;"></div>
                 </div>
             </div>
@@ -75,9 +75,8 @@
         </div>
         <div class="main-container">
             <div class="left-nav">
-                <div class="nav-item nav-item-xilian active" data-view="xilian">
-                    <span class="nav-text">昔涟</span>
-                    <span class="xilian-notify-dot" id="xilianNotifyDot" style="display:none;"></span>
+                <div class="nav-item nav-item-memos active" data-view="memos">
+                    <span class="nav-text">笔记</span>
                 </div>
                 <div class="nav-item" data-view="tasks">
                     <span class="nav-text">任务</span>
@@ -290,80 +289,19 @@
                             </div>
                         </div>
                         <!-- 聊天视图 -->
-                        <div id="xilianView" class="view-panel active">
-                            <div class="xilian-container">
-                                <!-- 聊天头部（聊天室/私聊模式） -->
-                                <div class="xilian-header" id="xilianHeader">
-                                    <!-- 左侧：头像列表 -->
-                                    <div class="xilian-header-avatars" id="xilianHeaderAvatars">
-                                        <div class="xilian-header-agent">
-                                            <img id="xilianHeaderAgentAvatar" src="" class="xilian-header-avatar" alt="智能体" style="width:24px;height:24px;border-radius:50%;">
-                                        </div>
-                                        <div class="xilian-header-user-avatar-mini">
-                                            <img id="xilianHeaderUserAvatar" src="" class="xilian-header-avatar" alt="用户" style="width:24px;height:24px;border-radius:50%;">
-                                        </div>
-                                    </div>
-                                    <!-- 中间：聊天室名字 -->
-                                    <div class="xilian-header-title" id="xilianHeaderTitle">Elysia Chat</div>
-                                    <!-- 右侧操作 -->
-                                    <div class="xilian-header-actions">
-                                        <button class="xilian-header-plus-btn" id="xilianHeaderPlusBtn" title="切换聊天室/智能体">+</button>
-                                        <!-- 下拉菜单 -->
-                                        <div class="xilian-header-dropdown" id="xilianHeaderDropdown" style="display:none;">
-                                            <div class="xilian-dropdown-section">
-                                                <div class="xilian-dropdown-label">私聊模式</div>
-                                                <div class="xilian-dropdown-subitem" data-action="switch-private">返回私聊</div>
-                                            </div>
-                                            <div class="xilian-dropdown-divider"></div>
-                                            <div class="xilian-dropdown-section">
-                                                <div class="xilian-dropdown-label">聊天室</div>
-                                                <div id="xilianDropdownRooms"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- @提及选择器 -->
-                                <div class="xilian-mention-panel" id="xilianMentionPanel" style="display:none;">
-                                    <div class="xilian-mention-list" id="xilianMentionList"></div>
-                                </div>
-                                <div class="xilian-messages" id="xilianMessages">
-                                    <div class="xilian-welcome">
-                                        <div class="xilian-welcome-inner">
-                                        <div class="xilian-welcome-icon"><img src="file:///D:/BaiduSyncdisk/Elysia/背景图/昔涟.gif" class="xilian-avatar-img xilian-welcome-avatar" style="width:64px;height:64px;border-radius:50%;" alt="昔涟"></div>
-                                        <h3>你好，我是昔涟</h3>
-                                        <p>我是你的小助理~有什么需要我来做的吗</p>
-                                        <div class="xilian-suggestions">
-                                            <button class="xilian-suggestion" data-prompt="帮我创建一个明天下午的任务：开会讨论项目进度">📋 创建任务</button>
-                                            <button class="xilian-suggestion" data-prompt="我今天午餐花了35元，帮我记一笔">💰 记一笔账</button>
-                                            <button class="xilian-suggestion" data-prompt="查看我今天的待办事项">📊 查看概况</button>
-                                            <button class="xilian-suggestion" data-prompt="帮我写一篇今天的日志，今天天气不错">📝 写日志</button>
-                                        </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="xilian-input-area">
-                                    <div class="xilian-input-wrapper">
-                                        <textarea id="xilianInput" class="xilian-input" placeholder="输入消息，来个人家聊聊天吧～🎶" rows="1"></textarea>
-                                        <button id="xilianSendBtn" class="xilian-send-btn" title="发送">
-                                            <svg class="xilian-send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                            </svg>
-                                            <svg class="xilian-stop-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none;">
-                                                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <div class="xilian-input-footer">
-                                        <span class="xilian-model-badge" id="xilianModelBadge">deepseek-v4-flash</span>
-                                        <button id="xilianClearHistoryBtn" class="xilian-clear-btn" title="清空对话">清空对话</button>
-                                    </div>
-                                </div>
-                                <div id="xilianToolStatus" class="xilian-tool-status" style="display:none;">
-                                    <div class="xilian-tool-status-dot"></div>
-                                    <span id="xilianToolStatusText">正在执行操作...</span>
+                        <div id="memosView" class="view-panel">
+                            <div class="panel-header">
+                                <h2 id="memoSectionTitle"><button id="togglePrivateBtn" class="memo-toggle-btn">笔记</button></h2>
+                                <div class="memo-header-actions">
+                                    <button id="newMemoBtn" class="update-btn" title="新建笔记">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
+                            <div id="memosContainer" class="memos-container"></div>
                         </div>
                         <div id="memoryView" class="view-panel">
                             <!-- MC fetch 拦截 shim：在模块加载前注入，把 /api 路由到 IPC -->
@@ -397,7 +335,7 @@
                             <div id="breadcrumb"></div>
                             <div id="mcBackfillWrap">
                                 <button class="mc-backfill-btn" id="mcBackfillBtn" title="将当前聊天记录录入星图">💬 录入对话</button>
-                                <button class="mc-backfill-btn" id="mcBackfillAllBtn" title="将全部备忘录和任务录入星图（不含私密备忘录）">📋 录入资料</button>
+                                <button class="mc-backfill-btn" id="mcBackfillAllBtn" title="将全部笔记和任务录入星图（不含私密笔记）">📋 录入资料</button>
                             </div>
                             <div id="topbar">
                                 <span class="tb-title">记忆宇宙</span>
@@ -753,19 +691,83 @@
         
         <div class="divider"></div>
         
-        <div class="right-panel memo-panel">
-            <div class="panel-header">
-                <h2 id="memoSectionTitle"><button id="togglePrivateBtn" class="memo-toggle-btn">备忘录</button></h2>
-                <div class="memo-header-actions">
-                    <button id="newMemoBtn" class="update-btn" title="新建备忘">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                    </button>
+        <div class="right-panel xilian-panel">
+            <div id="xilianView" class="view-panel active">
+                <div class="xilian-container">
+                    <!-- 聊天头部（聊天室/私聊模式） -->
+                    <div class="xilian-header" id="xilianHeader">
+                        <!-- 左侧：头像列表 -->
+                        <div class="xilian-header-avatars" id="xilianHeaderAvatars">
+                            <div class="xilian-header-agent">
+                                <img id="xilianHeaderAgentAvatar" src="" class="xilian-header-avatar" alt="智能体" style="width:24px;height:24px;border-radius:50%;">
+                            </div>
+                            <div class="xilian-header-user-avatar-mini">
+                                <img id="xilianHeaderUserAvatar" src="" class="xilian-header-avatar" alt="用户" style="width:24px;height:24px;border-radius:50%;">
+                            </div>
+                        </div>
+                        <!-- 中间：聊天室名字 -->
+                        <div class="xilian-header-title" id="xilianHeaderTitle">Elysia Chat</div>
+                        <!-- 右侧操作 -->
+                        <div class="xilian-header-actions">
+                            <button class="xilian-header-plus-btn" id="xilianHeaderPlusBtn" title="切换聊天室/智能体">+</button>
+                            <!-- 下拉菜单 -->
+                            <div class="xilian-header-dropdown" id="xilianHeaderDropdown" style="display:none;">
+                                <div class="xilian-dropdown-section">
+                                    <div class="xilian-dropdown-label">私聊模式</div>
+                                    <div class="xilian-dropdown-subitem" data-action="switch-private">返回私聊</div>
+                                </div>
+                                <div class="xilian-dropdown-divider"></div>
+                                <div class="xilian-dropdown-section">
+                                    <div class="xilian-dropdown-label">聊天室</div>
+                                    <div id="xilianDropdownRooms"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="xilian-notify-dot" id="xilianNotifyDot" style="display:none;"></span>
+                    </div>
+                    <!-- @提及选择器 -->
+                    <div class="xilian-mention-panel" id="xilianMentionPanel" style="display:none;">
+                        <div class="xilian-mention-list" id="xilianMentionList"></div>
+                    </div>
+                    <div class="xilian-messages" id="xilianMessages">
+                        <div class="xilian-welcome">
+                            <div class="xilian-welcome-inner">
+                                <div class="xilian-welcome-icon"><img src="file:///D:/BaiduSyncdisk/Elysia/背景图/昔涟.gif" class="xilian-avatar-img xilian-welcome-avatar" style="width:64px;height:64px;border-radius:50%;" alt="昔涟"></div>
+                                <h3>你好，我是昔涟</h3>
+                                <p>我是你的小助理~有什么需要我来做的吗</p>
+                                <div class="xilian-suggestions">
+                                    <button class="xilian-suggestion" data-prompt="帮我创建一个明天下午的任务：开会讨论项目进度">📋 创建任务</button>
+                                    <button class="xilian-suggestion" data-prompt="我今天午餐花了35元，帮我记一笔">💰 记一笔账</button>
+                                    <button class="xilian-suggestion" data-prompt="查看我今天的待办事项">📊 查看概况</button>
+                                    <button class="xilian-suggestion" data-prompt="帮我写一篇今天的日志，今天天气不错">📝 写日志</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="xilian-input-area">
+                        <div class="xilian-input-wrapper">
+                            <textarea id="xilianInput" class="xilian-input" placeholder="输入消息，来个人家聊聊天吧～🎶" rows="1"></textarea>
+                            <button id="xilianSendBtn" class="xilian-send-btn" title="发送">
+                                <svg class="xilian-send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                                <svg class="xilian-stop-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none;">
+                                    <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="xilian-input-footer">
+                            <span class="xilian-model-badge" id="xilianModelBadge">deepseek-v4-flash</span>
+                            <button id="xilianClearHistoryBtn" class="xilian-clear-btn" title="清空对话">清空对话</button>
+                        </div>
+                    </div>
+                    <div id="xilianToolStatus" class="xilian-tool-status" style="display:none;">
+                        <div class="xilian-tool-status-dot"></div>
+                        <span id="xilianToolStatusText">正在执行操作...</span>
+                    </div>
                 </div>
             </div>
-            <div id="memosContainer" class="memos-container"></div>
         </div>
     </div>
     </div>
@@ -1029,37 +1031,6 @@
                     <div class="form-error" id="reminderRangeError"></div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label reminder-notify-label">
-                        <input type="checkbox" id="reminderNotifyEnabled"> 是否需要提醒
-                    </label>
-                    <div class="reminder-notify-detail" id="reminderNotifyDetail" style="display:none;">
-                        <div class="reminder-detail-row">
-                            <span class="reminder-detail-label">提醒时间</span>
-                            <input type="time" id="reminderNotifyTime" value="09:00" class="form-input reminder-time-input">
-                        </div>
-                        <div class="reminder-detail-row">
-                            <span class="reminder-detail-label">频率</span>
-                            <select id="reminderNotifyFreq" class="form-input reminder-select-input">
-                                <option value="daily">每天</option>
-                                <option value="weekly">每周</option>
-                            </select>
-                        </div>
-                        <div class="reminder-detail-row" id="reminderNotifyWeekdayRow" style="display:none;">
-                            <span class="reminder-detail-label">星期</span>
-                            <div class="reminder-weekday-group" id="reminderNotifyWeekdayGroup">
-                                <label><input type="checkbox" value="1">一</label>
-                                <label><input type="checkbox" value="2">二</label>
-                                <label><input type="checkbox" value="3">三</label>
-                                <label><input type="checkbox" value="4">四</label>
-                                <label><input type="checkbox" value="5">五</label>
-                                <label><input type="checkbox" value="6">六</label>
-                                <label><input type="checkbox" value="0">日</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-error" id="reminderNotifyError"></div>
-                </div>
-                <div class="form-group">
                     <label class="form-label">触发频道</label>
                     <select id="reminderTargetSelect" class="form-input reminder-select-input"></select>
                     <div class="form-hint">私聊频道 = 该智能体的人设；聊天室频道 = 房间内智能体按既有规则响应</div>
@@ -1160,6 +1131,7 @@
                             <div class="sidebar-subitem" data-target="font-section" data-section="interface">字体设置</div>
                             <div class="sidebar-subitem" data-target="dark-bg-section" data-section="interface">深色背景</div>
                             <div class="sidebar-subitem" data-target="light-bg-section" data-section="interface">浅色背景</div>
+                            <div class="sidebar-subitem" data-target="chat-bg-section" data-section="interface">聊天背景</div>
                         </div>
                     </div>
                     <div class="sidebar-item" data-section="finance">
@@ -1197,7 +1169,7 @@
                         <span class="sidebar-text">说明</span>
                         <span class="sidebar-arrow">▼</span>
                         <div class="sidebar-submenu">
-                            <div class="sidebar-subitem" data-target="memo-guide-section" data-section="explain">备忘录</div>
+                            <div class="sidebar-subitem" data-target="memo-guide-section" data-section="explain">笔记</div>
                         </div>
                     </div>
                 </div>
@@ -1238,6 +1210,14 @@
                             <div class="form-group">
                                 <label>密钥卡片透明度: <span id="secretCardOpacityValue">80%</span></label>
                                 <input type="range" id="secretCardOpacity" min="30" max="100" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>提醒卡片透明度: <span id="reminderCardOpacityValue">80%</span></label>
+                                <input type="range" id="reminderCardOpacity" min="30" max="100" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>笔记卡片透明度: <span id="memoCardOpacityValue">80%</span></label>
+                                <input type="range" id="memoCardOpacity" min="30" max="100" value="80">
                             </div>
                         </div>
                         <div id="font-section" class="settings-section">
@@ -1340,6 +1320,44 @@
                                     <label><input type="radio" name="lightInvert" value="none" checked> 不反转</label>
                                     <label><input type="radio" name="lightInvert" value="invert"> 颜色反转</label>
                                     <label><input type="radio" name="lightInvert" value="grayscale"> 灰度</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="chat-bg-section" class="settings-section">
+                            <h5>聊天背景设置</h5>
+                            <div class="form-group">
+                                <label>选择背景图</label>
+                                <input type="file" id="chatBackgroundImageInput" accept="image/png, image/jpeg, image/jpg" style="display: none;">
+                                <button id="selectChatBackgroundBtn" class="btn btn-primary">选择图片</button>
+                                <button id="clearChatBackgroundBtn" class="btn btn-secondary">去除背景图</button>
+                                <span id="chatCurrentBackgroundPath" class="file-path"></span>
+                            </div>
+                            <div class="form-group">
+                                <label>背景位置（水平）: <span id="chatBackgroundPositionXValue">50%</span></label>
+                                <input type="range" id="chatBackgroundPositionX" min="-200" max="200" value="50">
+                            </div>
+                            <div class="form-group">
+                                <label>背景位置（垂直）: <span id="chatBackgroundPositionYValue">100%</span></label>
+                                <input type="range" id="chatBackgroundPositionY" min="-200" max="200" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label>背景比例: <span id="chatBackgroundSizeWidthValue">70%</span></label>
+                                <input type="range" id="chatBackgroundSizeWidth" min="-200" max="200" value="70">
+                            </div>
+                            <div class="form-group">
+                                <label>背景透明度: <span id="chatBackgroundOpacityValue">100%</span></label>
+                                <input type="range" id="chatBackgroundOpacity" min="0" max="100" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label>背景模糊: <span id="chatBackgroundBlurValue">0px</span></label>
+                                <input type="range" id="chatBackgroundBlur" min="0" max="30" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>颜色叠加:</label>
+                                <div class="color-overlay-group">
+                                    <input type="color" id="chatOverlayColor" value="000000">
+                                    <input type="range" id="chatOverlayOpacity" min="0" max="100" value="0">
+                                    <span id="chatOverlayOpacityValue">0%</span>
                                 </div>
                             </div>
                         </div>
@@ -1779,7 +1797,7 @@
                                     删除操作需确认
                                     <input type="checkbox" id="aiDeleteConfirmEnabled" checked style="width:16px; height:16px;">
                                 </label>
-                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary);">AI 执行删除任务/备忘录/收支前弹窗确认</span>
+                                <span class="form-hint" style="font-size:11px; color:var(--text-secondary);">AI 执行删除任务/笔记/收支前弹窗确认</span>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" style="display:flex; align-items:center; gap:8px;">
@@ -1799,9 +1817,9 @@
                     <div id="settingsExplain" class="settings-panel">
                         <h4>说明</h4>
                         <div id="memo-guide-section" class="settings-section">
-                            <h5>备忘录 Markdown 快捷键</h5>
+                            <h5>笔记 Markdown 快捷键</h5>
                             <p class="md-guide-intro">
-                                备忘录编辑器内置了类飞书 / Notion 的 Markdown 快捷输入，<strong>无需使用工具栏</strong>。
+                                笔记编辑器内置了类飞书 / Notion 的 Markdown 快捷输入，<strong>无需使用工具栏</strong>。
                                 在行首输入对应符号后按 <span class="md-kbd">空格</span> 或 <span class="md-kbd">回车</span> 即可自动转换为对应格式；
                                 行内样式在输入成对的标记后按 <span class="md-kbd">空格</span> 触发。
                             </p>
@@ -1863,7 +1881,7 @@
                                 <table class="md-guide-table">
                                     <thead><tr><th>操作</th><th>效果</th></tr></thead>
                                     <tbody>
-                                        <tr><td>在备忘录里粘贴一个网址</td><td>自动变成可点击链接（显示网页标题）</td></tr>
+                                        <tr><td>在笔记里粘贴一个网址</td><td>自动变成可点击链接（显示网页标题）</td></tr>
                                         <tr><td>粘贴含网址的整段文字</td><td>其中的网址自动识别为链接</td></tr>
                                         <tr><td>点击编辑器内的链接</td><td>调用系统默认浏览器打开该网页</td></tr>
                                     </tbody>
@@ -1904,10 +1922,10 @@
         </div>
     </div>
     
-    <script src="xilian-ui.js?v=2026073004"></script>
+    <script src="xilian-ui.js?v=2026080301"></script>
     <script src="xilian-settings.js?v=2026073004"></script>
     <script src="chat-room-manager.js?v=2026073004"></script>
-    <script src="xilian-manager.js?v=2026073004"></script>
-    <script src="app.js?v=2026073009"></script>
+    <script src="xilian-manager.js?v=2026080301"></script>
+    <script src="app.js?v=2026080302"></script>
 </body>
 </html>

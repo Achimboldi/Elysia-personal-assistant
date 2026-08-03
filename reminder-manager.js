@@ -391,6 +391,7 @@ async function saveReminder(reminder, options = {}) {
     targetId,
     agentPresetId: reminder.agentPresetId || targetId || '',
     createdBy: reminder.createdBy || options.createdBy || 'user',
+    creator: reminder.creator || '',
     createdAt: now,
     updatedAt: now,
     lastTriggeredAt: null,

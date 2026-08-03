@@ -145,12 +145,12 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'createMemo',
-      description: '创建一条新备忘录。用户说"记一下"、"备忘"、"帮我记下来"时使用。',
+      description: '创建一条新笔记。用户说"记一下"、"备忘"、"帮我记下来"时使用。',
       parameters: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: '备忘录标题' },
-          content: { type: 'string', description: '备忘录内容（必填）' },
+          title: { type: 'string', description: '笔记标题' },
+          content: { type: 'string', description: '笔记内容（必填）' },
           isPrivate: { type: 'boolean', description: '是否设为私密，默认false' }
         },
         required: ['content']
@@ -161,11 +161,11 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'updateMemo',
-      description: '更新备忘录的标题或内容。如果不确定备忘录ID，请先调用 listMemos 按关键词搜索。',
+      description: '更新笔记的标题或内容。如果不确定笔记ID，请先调用 listMemos 按关键词搜索。',
       parameters: {
         type: 'object',
         properties: {
-          memoId: { type: 'string', description: '备忘录ID（必填）' },
+          memoId: { type: 'string', description: '笔记ID（必填）' },
           title: { type: 'string', description: '新标题' },
           content: { type: 'string', description: '新内容' }
         },
@@ -177,12 +177,12 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'deleteMemo',
-      description: '删除一条备忘录。⚠️ 需要用户确认。如果不确定ID，请先调用 listMemos 按关键词搜索。',
+      description: '删除一条笔记。⚠️ 需要用户确认。如果不确定ID，请先调用 listMemos 按关键词搜索。',
       parameters: {
         type: 'object',
         properties: {
-          memoId: { type: 'string', description: '备忘录ID（必填）' },
-          memoTitle: { type: 'string', description: '备忘录标题（用于确认提示）' }
+          memoId: { type: 'string', description: '笔记ID（必填）' },
+          memoTitle: { type: 'string', description: '笔记标题（用于确认提示）' }
         },
         required: ['memoId']
       }
@@ -192,7 +192,7 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'listMemos',
-      description: '列出所有备忘录。用户说"查看备忘录"、"搜索备忘录"时使用。',
+      description: '列出所有笔记。用户说"查看笔记"、"搜索笔记"时使用。',
       parameters: {
         type: 'object',
         properties: {
@@ -694,21 +694,18 @@ const TOOL_DEFINITIONS = [
               month: { type: 'number', description: '每年第几个月，1-12' },
               intervalMinutes: { type: 'number', description: '间隔分钟数，如 90 表示每90分钟' },
               startAt: { type: 'string', description: '间隔起始时间 ISO，如 2026-08-01T08:00:00' },
-              datetime: { type: 'string', description: '单次触发时间 ISO，如 2026-08-01T09:00:00' }
+              datetime: { type: 'string', description: '单次触发时间 ISO，如 2026-08-01T09:00:00（单次提醒的生效区间应设为触发当天）' }
             },
             required: ['type']
           },
           dateRange: {
             type: 'object',
-            description: '生效日期区间（选填，null=不限）',
+            description: '生效日期区间（选填，null=不限；单次提醒请填触发当天，如 start 和 end 都为今天）',
             properties: {
               start: { type: 'string', description: '开始日期 YYYY-MM-DD' },
               end: { type: 'string', description: '结束日期 YYYY-MM-DD' }
             }
           },
-          notifyEnabled: { type: 'boolean', description: '是否需要额外提醒' },
-          notifyTime: { type: 'string', description: '提醒时间 HH:mm（notifyEnabled 时必填）' },
-          notifyWeekday: { type: 'array', items: { type: 'number' }, description: '提醒频率星期，空=每天' }
         },
         required: ['name', 'schedule']
       }
@@ -1009,10 +1006,10 @@ function checkDuplicateMemo(data, args, userId) {
   for (const m of (data.memos || [])) {
     if (m.userId !== userId) continue;
     if (title && m.title && isStringSimilar(m.title, title)) {
-      return { existing: m, warning: `已有相似标题的备忘录「${m.title || '无标题'}」` };
+    return { existing: m, warning: `已有相似标题的笔记「${m.title || '无标题'}」` };
     }
     if (content && m.content && isStringSimilar(m.content, content) && content.length > 5) {
-      return { existing: m, warning: `已有内容相似的备忘录「${m.title || '无标题'}」` };
+    return { existing: m, warning: `已有内容相似的笔记「${m.title || '无标题'}」` };
     }
   }
   return null;
@@ -1231,7 +1228,7 @@ async function createMemo(args) {
   broadcast('memos-updated');
 
   const result = {
-    message: `✅ 已创建备忘录「${memo.title || '无标题'}」${memo.isPrivate ? '🔒(私密)' : ''}`,
+    message: `✅ 已创建笔记「${memo.title || '无标题'}」${memo.isPrivate ? '🔒(私密)' : ''}`,
     data: { id: memo.id, title: memo.title }
   };
   if (dupCheck) {
@@ -1246,7 +1243,7 @@ async function updateMemo(args) {
   const data = readData();
   const idx = data.memos.findIndex(m => m.id === args.memoId && m.userId === userId);
 
-  if (idx === -1) return { message: `未找到备忘录 ID: ${args.memoId}` };
+    if (idx === -1) return { message: `未找到笔记 ID: ${args.memoId}` };
 
   if (args.title !== undefined) data.memos[idx].title = args.title;
   if (args.content !== undefined) data.memos[idx].content = args.content;
@@ -1257,11 +1254,11 @@ async function updateMemo(args) {
     data.secrets || [], data.journals || [], true, data.chatHistory);
   broadcast('memos-updated');
 
-  return { message: `✅ 已更新备忘录「${data.memos[idx].title || '无标题'}」` };
+    return { message: `✅ 已更新笔记「${data.memos[idx].title || '无标题'}」` };
 }
 
 async function deleteMemo(args) {
-  return await _deleteGeneric(args.memoId, 'memos', '备忘录', args.memoTitle);
+    return await _deleteGeneric(args.memoId, 'memos', '笔记', args.memoTitle);
 }
 
 async function listMemos(args) {
@@ -1283,8 +1280,8 @@ async function listMemos(args) {
 
   return {
     message: memos.length > 0
-      ? `找到 ${memos.length} 条备忘录:\n${summary.map(m => `- ${m.isPrivate ? '🔒 ' : ''}${m.title}`).join('\n')}`
-      : '没有找到备忘录。',
+    ? `找到 ${memos.length} 条笔记:\n${summary.map(m => `- ${m.isPrivate ? '🔒 ' : ''}${m.title}`).join('\n')}`
+    : '没有找到笔记。',
     data: { memos: summary, total: memos.length }
   };
 }
@@ -1780,7 +1777,7 @@ async function getDashboard(args) {
     message: `📋 今日概览:\n`
       + `今日任务: ${todayTasks.length}个 (总共${pendingTasks.length}个待完成${urgentTasks.length > 0 ? `，${urgentTasks.length}个紧急` : ''})\n`
       + `本周收入: ${weekIncome.toFixed(2)}元 | 本周支出: ${weekSpent.toFixed(2)}元\n`
-      + `备忘录: ${data.memos.length}条 | 日志: ${data.journals.length}篇${todayJournal ? ' | 今天已写日志' : ' | 今天还没写日志'}`,
+    + `笔记: ${data.memos.length}条 | 日志: ${data.journals.length}篇${todayJournal ? ' | 今天已写日志' : ' | 今天还没写日志'}`,
     data: {
       todayTasks: todayTasks.length,
       pendingTasks: pendingTasks.length,
@@ -2055,18 +2052,24 @@ async function createReminder(args) {
   const rm = _getReminderModule();
   if (!rm) return { message: '提醒模块未就绪，请重启应用后重试' };
   const channel = _resolveReminderChannel();
+  // ★ 生效区间默认：单次提醒未指定时，默认今天（当天触发一次，避免"没选日期"语义缺失）
+  let dateRange = args.dateRange || null;
+  if (!dateRange && args.schedule && args.schedule.type === 'once') {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    dateRange = { start: today, end: today };
+  }
   const result = await rm.saveReminder({
     name: args.name,
     prompt: args.prompt || '',
     schedule: args.schedule || {},
-    dateRange: args.dateRange || null,
-    notifyEnabled: !!args.notifyEnabled,
-    notifyTime: args.notifyTime || '',
-    notifyWeekday: args.notifyWeekday || [],
+    dateRange,
     targetType: channel.targetType,
     targetId: channel.targetId,
     agentPresetId: channel.agentPresetId,
-    createdBy: 'agent'
+    createdBy: 'agent',
+    creator: global._currentAIAgentCreatorName || 'AI助手'
   });
   if (!result.success) return { message: `创建提醒失败：${result.message}` };
   const freqText = rm.describeSchedule ? rm.describeSchedule(result.reminder.schedule) : (result.reminder.schedule.type || '');

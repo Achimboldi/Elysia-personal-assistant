@@ -589,7 +589,7 @@ function cleanupForeignUserData() {
 
     return {
       success: true,
-      message: `清理完成: 任务(${removedTasks})、备忘录(${removedMemos})、收支(${removedExpenses})、预算(${removedBudgets})、分类预算(${removedCategoryBudgets})、密钥(${removedSecrets})、日志(${removedJournals})`,
+      message: `清理完成: 任务(${removedTasks})、笔记(${removedMemos})、收支(${removedExpenses})、预算(${removedBudgets})、分类预算(${removedCategoryBudgets})、密钥(${removedSecrets})、日志(${removedJournals})`,
       removed: { tasks: removedTasks, memos: removedMemos, expenses: removedExpenses, budgets: removedBudgets, categoryBudgets: removedCategoryBudgets, secrets: removedSecrets, journals: removedJournals }
     };
   }

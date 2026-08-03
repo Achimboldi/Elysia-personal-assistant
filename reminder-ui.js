@@ -90,15 +90,6 @@ class ReminderUI {
       opt.addEventListener('click', () => this._setPeriodType(opt.dataset.period));
     });
 
-    // 是否需要提醒 → 展开详情
-    const notifyChk = document.getElementById('reminderNotifyEnabled');
-    if (notifyChk) notifyChk.addEventListener('change', () => this._updateNotifyDetail());
-
-    // 提醒频率：每周 → 显示星期多选
-    const notifyFreq = document.getElementById('reminderNotifyFreq');
-    if (notifyFreq) notifyFreq.addEventListener('change', () => {
-      this._setNotifyWeekdayVisible(notifyFreq.value);
-    });
   }
 
   // ============================================================
@@ -147,7 +138,9 @@ class ReminderUI {
     const statusLabel = STATUS_LABELS[status] || status;
     const nextText = r.nextTriggerAt ? this.formatDateTime(r.nextTriggerAt) : '—';
     const freqText = this.describeSchedule(r.schedule);
-    const agentTag = r.createdBy === 'agent' ? '<span class="reminder-agent-tag">🤖 智能体创建</span>' : '';
+    const agentTag = r.createdBy === 'agent'
+      ? XilianUI.renderCreatorBadge(r.creator || this._resolveHistoryAgentName(r, null) || '智能体')
+      : '';
     const promptTag = r.prompt ? '<span class="reminder-prompt-tag">提示词</span>' : '';
     const triggerInfo = r.triggerCount ? ` · 已触发 ${r.triggerCount} 次` : '';
     const historyHtml = this.renderHistory(r);
@@ -337,18 +330,6 @@ class ReminderUI {
     document.getElementById('reminderRangeEnd').value =
       reminder && reminder.dateRange && reminder.dateRange.end ? reminder.dateRange.end : '';
 
-    // notify
-    const notifyEnabled = reminder ? !!reminder.notifyEnabled : false;
-    document.getElementById('reminderNotifyEnabled').checked = notifyEnabled;
-    this._updateNotifyDetail();
-    document.getElementById('reminderNotifyTime').value = reminder && reminder.notifyTime ? reminder.notifyTime : '09:00';
-    const notifyFreq = reminder && Array.isArray(reminder.notifyWeekday) && reminder.notifyWeekday.length ? 'weekly' : 'daily';
-    document.getElementById('reminderNotifyFreq').value = notifyFreq;
-    this._setNotifyWeekdayVisible(notifyFreq);
-    if (reminder && Array.isArray(reminder.notifyWeekday)) {
-      this._setWeekdayCheckboxes('reminderNotifyWeekdayGroup', reminder.notifyWeekday);
-    }
-
     // 触发频道
     this._populateTargetSelect(reminder);
 
@@ -391,21 +372,6 @@ class ReminderUI {
       return;
     }
 
-    // notify 校验
-    const notifyEnabled = document.getElementById('reminderNotifyEnabled').checked;
-    const notifyTime = notifyEnabled ? document.getElementById('reminderNotifyTime').value : '';
-    const notifyFreq = document.getElementById('reminderNotifyFreq').value;
-    const notifyWeekday =
-      notifyEnabled && notifyFreq === 'weekly' ? this._collectWeekday('reminderNotifyWeekdayGroup') : [];
-    if (notifyEnabled && !notifyTime) {
-      this._showError('reminderNotifyError', '开启提醒后请选择提醒时间');
-      return;
-    }
-    if (notifyEnabled && notifyFreq === 'weekly' && notifyWeekday.length === 0) {
-      this._showError('reminderNotifyError', '每周提醒请至少选择一个星期');
-      return;
-    }
-
     // 触发频道（value 形如 private:xxx / room:xxx）
     const targetValue = document.getElementById('reminderTargetSelect').value || '';
     let targetType = 'private';
@@ -430,9 +396,10 @@ class ReminderUI {
       prompt,
       schedule,
       dateRange: { start: rangeStart, end: rangeEnd },
-      notifyEnabled,
-      notifyTime,
-      notifyWeekday,
+      // 提醒始终按执行频率触发，不再需要独立的"是否需要提醒"开关
+      notifyEnabled: true,
+      notifyTime: '',
+      notifyWeekday: [],
       targetType,
       targetId,
       agentPresetId: targetType === 'private' ? targetId : (this._currentPresetId || targetId)
@@ -614,17 +581,6 @@ class ReminderUI {
     show('reminderWeekdayRow', type === 'weekly');
     show('reminderMonthlyRow', type === 'monthly');
     show('reminderYearlyRow', type === 'yearly');
-  }
-
-  _updateNotifyDetail() {
-    const chk = document.getElementById('reminderNotifyEnabled');
-    const detail = document.getElementById('reminderNotifyDetail');
-    if (detail) detail.style.display = chk && chk.checked ? 'block' : 'none';
-  }
-
-  _setNotifyWeekdayVisible(freq) {
-    const row = document.getElementById('reminderNotifyWeekdayRow');
-    if (row) row.style.display = freq === 'weekly' ? 'flex' : 'none';
   }
 
   _collectWeekday(groupId) {

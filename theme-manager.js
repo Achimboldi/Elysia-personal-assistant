@@ -87,6 +87,8 @@ class ThemeManager {
       this.savedCalendarOpacity = settings.calendarOpacity || '80';
       this.savedBudgetOpacity = settings.budgetOpacity || '80';
       this.savedSecretOpacity = settings.secretCardOpacity || '80';
+      this.savedReminderOpacity = settings.reminderCardOpacity || '80';
+      this.savedMemoOpacity = settings.memoCardOpacity || '80';
       
       this.savedDarkBackgroundImage = settings.darkBackgroundImage ? decodeURIComponent(settings.darkBackgroundImage) : '';
       this.savedDarkBackgroundPositionX = settings.darkBackgroundPositionX !== undefined ? settings.darkBackgroundPositionX : '50';
@@ -105,6 +107,15 @@ class ThemeManager {
       this.savedLightOverlayColor = settings.lightOverlayColor || '#000000';
       this.savedLightOverlayOpacity = settings.lightOverlayOpacity || '0';
       this.savedLightInvert = settings.lightInvert !== undefined ? settings.lightInvert : 'none';
+
+      this.savedChatBackgroundImage = settings.chatBackgroundImage ? decodeURIComponent(settings.chatBackgroundImage) : '';
+      this.savedChatBackgroundPositionX = settings.chatBackgroundPositionX !== undefined ? settings.chatBackgroundPositionX : '50';
+      this.savedChatBackgroundPositionY = settings.chatBackgroundPositionY !== undefined ? settings.chatBackgroundPositionY : '100';
+      this.savedChatBackgroundSizeWidth = settings.chatBackgroundSizeWidth !== undefined ? settings.chatBackgroundSizeWidth : '70';
+      this.savedChatBackgroundOpacity = settings.chatBackgroundOpacity || '100';
+      this.savedChatBackgroundBlur = settings.chatBackgroundBlur !== undefined ? settings.chatBackgroundBlur : '0';
+      this.savedChatOverlayColor = settings.chatOverlayColor || '#000000';
+      this.savedChatOverlayOpacity = settings.chatOverlayOpacity || '0';
     } catch {
       console.warn('从主进程获取设置失败，使用默认值');
       this._resetToDefaults();
@@ -113,6 +124,7 @@ class ThemeManager {
     this._updateUIElements();
     this.applyBackgroundSettings();
     this.applyCardOpacity();
+    this.applyChatBackground();
   }
 
   _resetToDefaults() {
@@ -122,6 +134,8 @@ class ThemeManager {
     this.savedCalendarOpacity = '80';
     this.savedBudgetOpacity = '80';
     this.savedSecretOpacity = '80';
+    this.savedReminderOpacity = '80';
+    this.savedMemoOpacity = '80';
     
     this.savedDarkBackgroundImage = '';
     this.savedDarkBackgroundPositionX = '50';
@@ -140,6 +154,15 @@ class ThemeManager {
     this.savedLightOverlayColor = '#000000';
     this.savedLightOverlayOpacity = '0';
     this.savedLightInvert = 'none';
+
+    this.savedChatBackgroundImage = '';
+    this.savedChatBackgroundPositionX = '50';
+    this.savedChatBackgroundPositionY = '100';
+    this.savedChatBackgroundSizeWidth = '70';
+    this.savedChatBackgroundOpacity = '100';
+    this.savedChatBackgroundBlur = '0';
+    this.savedChatOverlayColor = '#000000';
+    this.savedChatOverlayOpacity = '0';
   }
 
   _updateUIElements() {
@@ -155,6 +178,10 @@ class ThemeManager {
     document.getElementById('budgetOpacityValue').textContent = this.savedBudgetOpacity + '%';
     document.getElementById('secretCardOpacity').value = this.savedSecretOpacity;
     document.getElementById('secretCardOpacityValue').textContent = this.savedSecretOpacity + '%';
+    document.getElementById('reminderCardOpacity').value = this.savedReminderOpacity;
+    document.getElementById('reminderCardOpacityValue').textContent = this.savedReminderOpacity + '%';
+    document.getElementById('memoCardOpacity').value = this.savedMemoOpacity;
+    document.getElementById('memoCardOpacityValue').textContent = this.savedMemoOpacity + '%';
     
     document.getElementById('darkBackgroundPositionX').value = this.savedDarkBackgroundPositionX;
     document.getElementById('darkBackgroundPositionXValue').textContent = this.savedDarkBackgroundPositionX + '%';
@@ -191,6 +218,23 @@ class ThemeManager {
     }
     if (this.savedLightBackgroundImage) {
       document.getElementById('lightCurrentBackgroundPath').textContent = this.savedLightBackgroundImage;
+    }
+
+    document.getElementById('chatBackgroundPositionX').value = this.savedChatBackgroundPositionX;
+    document.getElementById('chatBackgroundPositionXValue').textContent = this.savedChatBackgroundPositionX + '%';
+    document.getElementById('chatBackgroundPositionY').value = this.savedChatBackgroundPositionY;
+    document.getElementById('chatBackgroundPositionYValue').textContent = this.savedChatBackgroundPositionY + '%';
+    document.getElementById('chatBackgroundSizeWidth').value = this.savedChatBackgroundSizeWidth;
+    document.getElementById('chatBackgroundSizeWidthValue').textContent = this.savedChatBackgroundSizeWidth + '%';
+    document.getElementById('chatBackgroundOpacity').value = this.savedChatBackgroundOpacity;
+    document.getElementById('chatBackgroundOpacityValue').textContent = this.savedChatBackgroundOpacity + '%';
+    document.getElementById('chatBackgroundBlur').value = this.savedChatBackgroundBlur;
+    document.getElementById('chatBackgroundBlurValue').textContent = this.savedChatBackgroundBlur + 'px';
+    document.getElementById('chatOverlayColor').value = this.savedChatOverlayColor;
+    document.getElementById('chatOverlayOpacity').value = this.savedChatOverlayOpacity;
+    document.getElementById('chatOverlayOpacityValue').textContent = this.savedChatOverlayOpacity + '%';
+    if (this.savedChatBackgroundImage) {
+      document.getElementById('chatCurrentBackgroundPath').textContent = this.savedChatBackgroundImage;
     }
   }
 
@@ -249,6 +293,32 @@ class ThemeManager {
     }
   }
 
+  applyChatBackground() {
+    const image = this.savedChatBackgroundImage || '';
+    const posX = parseInt(this.savedChatBackgroundPositionX || '50');
+    const posY = parseInt(this.savedChatBackgroundPositionY || '100');
+    const sizeW = parseInt(this.savedChatBackgroundSizeWidth || '70');
+    const opacity = (this.savedChatBackgroundOpacity || 100) / 100;
+    const blur = parseInt(this.savedChatBackgroundBlur || '0') || 0;
+    const overlayColor = this.savedChatOverlayColor || '#000000';
+    const overlayOpacity = (this.savedChatOverlayOpacity || 0) / 100;
+
+    if (image) {
+      document.documentElement.style.setProperty('--chat-background-image', `url('${image}')`);
+    } else {
+      document.documentElement.style.removeProperty('--chat-background-image');
+    }
+    document.documentElement.style.setProperty('--chat-background-position', `${posX}% ${posY}%`);
+    document.documentElement.style.setProperty('--chat-background-size', `${sizeW}% auto`);
+    document.documentElement.style.setProperty('--chat-background-opacity', opacity);
+    document.documentElement.style.setProperty('--chat-background-blur', `${blur}px`);
+    if (overlayOpacity > 0) {
+      document.documentElement.style.setProperty('--chat-overlay-color', `${overlayColor}${Math.round(overlayOpacity * 255).toString(16).padStart(2, '0')}`);
+    } else {
+      document.documentElement.style.setProperty('--chat-overlay-color', 'transparent');
+    }
+  }
+
   applyCardOpacity() {
     const taskOpacity = document.getElementById('taskCardOpacity').value / 100;
     const expenseOpacity = document.getElementById('expenseCardOpacity').value / 100;
@@ -256,6 +326,8 @@ class ThemeManager {
     const calendarOpacity = document.getElementById('calendarOpacity').value / 100;
     const budgetOpacity = document.getElementById('budgetOpacity').value / 100;
     const secretOpacity = document.getElementById('secretCardOpacity').value / 100;
+    const reminderOpacity = document.getElementById('reminderCardOpacity').value / 100;
+    const memoOpacity = document.getElementById('memoCardOpacity').value / 100;
     
     document.documentElement.style.setProperty('--task-card-opacity', taskOpacity);
     document.documentElement.style.setProperty('--expense-card-opacity', expenseOpacity);
@@ -263,6 +335,8 @@ class ThemeManager {
     document.documentElement.style.setProperty('--calendar-opacity', calendarOpacity);
     document.documentElement.style.setProperty('--budget-opacity', budgetOpacity);
     document.documentElement.style.setProperty('--secret-card-opacity', secretOpacity);
+    document.documentElement.style.setProperty('--reminder-card-opacity', reminderOpacity);
+    document.documentElement.style.setProperty('--memo-card-opacity', memoOpacity);
     
     document.querySelectorAll('.task-card, .task-group').forEach(card => {
       card.style.opacity = taskOpacity;
@@ -287,6 +361,14 @@ class ThemeManager {
     document.querySelectorAll('.secret-card').forEach(card => {
       card.style.opacity = secretOpacity;
     });
+
+    document.querySelectorAll('.reminder-card').forEach(card => {
+      card.style.opacity = reminderOpacity;
+    });
+
+    document.querySelectorAll('.memo-card').forEach(card => {
+      card.style.opacity = memoOpacity;
+    });
   }
 
   getSavedSettings() {
@@ -297,6 +379,8 @@ class ThemeManager {
       calendarOpacity: this.savedCalendarOpacity,
       budgetOpacity: this.savedBudgetOpacity,
       secretOpacity: this.savedSecretOpacity,
+      reminderOpacity: this.savedReminderOpacity,
+      memoOpacity: this.savedMemoOpacity,
       darkBackgroundImage: this.savedDarkBackgroundImage,
       darkBackgroundPositionX: this.savedDarkBackgroundPositionX,
       darkBackgroundPositionY: this.savedDarkBackgroundPositionY,
@@ -312,7 +396,15 @@ class ThemeManager {
       lightBackgroundOpacity: this.savedLightBackgroundOpacity,
       lightOverlayColor: this.savedLightOverlayColor,
       lightOverlayOpacity: this.savedLightOverlayOpacity,
-      lightInvert: this.savedLightInvert
+      lightInvert: this.savedLightInvert,
+      chatBackgroundImage: this.savedChatBackgroundImage,
+      chatBackgroundPositionX: this.savedChatBackgroundPositionX,
+      chatBackgroundPositionY: this.savedChatBackgroundPositionY,
+      chatBackgroundSizeWidth: this.savedChatBackgroundSizeWidth,
+      chatBackgroundOpacity: this.savedChatBackgroundOpacity,
+      chatBackgroundBlur: this.savedChatBackgroundBlur,
+      chatOverlayColor: this.savedChatOverlayColor,
+      chatOverlayOpacity: this.savedChatOverlayOpacity
     };
   }
 
@@ -342,6 +434,8 @@ class ThemeManager {
     const calendarOpacity = document.getElementById('calendarOpacity').value / 100;
     const budgetOpacity = document.getElementById('budgetOpacity').value / 100;
     const secretOpacity = document.getElementById('secretCardOpacity').value / 100;
+    const reminderOpacity = document.getElementById('reminderCardOpacity').value / 100;
+    const memoOpacity = document.getElementById('memoCardOpacity').value / 100;
     
     document.documentElement.style.setProperty('--task-card-opacity', taskOpacity);
     document.documentElement.style.setProperty('--expense-card-opacity', expenseOpacity);
@@ -349,6 +443,8 @@ class ThemeManager {
     document.documentElement.style.setProperty('--calendar-opacity', calendarOpacity);
     document.documentElement.style.setProperty('--budget-opacity', budgetOpacity);
     document.documentElement.style.setProperty('--secret-card-opacity', secretOpacity);
+    document.documentElement.style.setProperty('--reminder-card-opacity', reminderOpacity);
+    document.documentElement.style.setProperty('--memo-card-opacity', memoOpacity);
     
     document.querySelectorAll('.task-card, .task-group').forEach(card => {
       card.style.opacity = taskOpacity;
@@ -373,6 +469,14 @@ class ThemeManager {
     document.querySelectorAll('.secret-card').forEach(card => {
       card.style.opacity = secretOpacity;
     });
+
+    document.querySelectorAll('.reminder-card').forEach(card => {
+      card.style.opacity = reminderOpacity;
+    });
+
+    document.querySelectorAll('.memo-card').forEach(card => {
+      card.style.opacity = memoOpacity;
+    });
   }
 
   async saveBackgroundSettings() {
@@ -388,6 +492,8 @@ class ThemeManager {
       const calendarOpacity = document.getElementById('calendarOpacity').value;
       const budgetOpacity = document.getElementById('budgetOpacity').value;
       const secretOpacity = document.getElementById('secretCardOpacity').value;
+      const reminderOpacity = document.getElementById('reminderCardOpacity').value;
+      const memoOpacity = document.getElementById('memoCardOpacity').value;
       
       const darkBackgroundPositionX = document.getElementById('darkBackgroundPositionX').value;
       const darkBackgroundPositionY = document.getElementById('darkBackgroundPositionY').value;
@@ -405,6 +511,14 @@ class ThemeManager {
       const lightOverlayOpacity = document.getElementById('lightOverlayOpacity').value;
       const lightInvert = document.querySelector('input[name="lightInvert"]:checked').value;
 
+      const chatBackgroundPositionX = document.getElementById('chatBackgroundPositionX').value;
+      const chatBackgroundPositionY = document.getElementById('chatBackgroundPositionY').value;
+      const chatBackgroundSizeWidth = document.getElementById('chatBackgroundSizeWidth').value;
+      const chatBackgroundOpacity = document.getElementById('chatBackgroundOpacity').value;
+      const chatBackgroundBlur = document.getElementById('chatBackgroundBlur').value;
+      const chatOverlayColor = document.getElementById('chatOverlayColor').value;
+      const chatOverlayOpacity = document.getElementById('chatOverlayOpacity').value;
+
       await ipcRenderer.invoke('save-settings', {
         theme: themeMode,
         taskCardOpacity: taskOpacity,
@@ -413,6 +527,8 @@ class ThemeManager {
         calendarOpacity: calendarOpacity,
         budgetOpacity: budgetOpacity,
         secretCardOpacity: secretOpacity,
+        reminderCardOpacity: reminderOpacity,
+        memoCardOpacity: memoOpacity,
         darkBackgroundImage: this.savedDarkBackgroundImage ? encodeURIComponent(this.savedDarkBackgroundImage) : '',
         darkBackgroundPositionX: darkBackgroundPositionX,
         darkBackgroundPositionY: darkBackgroundPositionY,
@@ -428,7 +544,15 @@ class ThemeManager {
         lightBackgroundOpacity: lightBackgroundOpacity,
         lightOverlayColor: lightOverlayColor,
         lightOverlayOpacity: lightOverlayOpacity,
-        lightInvert: lightInvert
+        lightInvert: lightInvert,
+        chatBackgroundImage: this.savedChatBackgroundImage ? encodeURIComponent(this.savedChatBackgroundImage) : '',
+        chatBackgroundPositionX: chatBackgroundPositionX,
+        chatBackgroundPositionY: chatBackgroundPositionY,
+        chatBackgroundSizeWidth: chatBackgroundSizeWidth,
+        chatBackgroundOpacity: chatBackgroundOpacity,
+        chatBackgroundBlur: chatBackgroundBlur,
+        chatOverlayColor: chatOverlayColor,
+        chatOverlayOpacity: chatOverlayOpacity
       });
 
       this.savedDarkBackgroundPositionX = darkBackgroundPositionX;
@@ -446,6 +570,14 @@ class ThemeManager {
       this.savedLightOverlayColor = lightOverlayColor;
       this.savedLightOverlayOpacity = lightOverlayOpacity;
       this.savedLightInvert = lightInvert;
+
+      this.savedChatBackgroundPositionX = chatBackgroundPositionX;
+      this.savedChatBackgroundPositionY = chatBackgroundPositionY;
+      this.savedChatBackgroundSizeWidth = chatBackgroundSizeWidth;
+      this.savedChatBackgroundOpacity = chatBackgroundOpacity;
+      this.savedChatBackgroundBlur = chatBackgroundBlur;
+      this.savedChatOverlayColor = chatOverlayColor;
+      this.savedChatOverlayOpacity = chatOverlayOpacity;
           resolve(true);
         } catch (e) {
           console.error('保存背景设置失败:', e);
