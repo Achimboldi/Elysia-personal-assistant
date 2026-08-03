@@ -13,6 +13,14 @@ const { safeLog, safeError, normalizeDate, generateContentHash, sendToAllWindows
 const { getDataFilePath, getCurrentUserId, isOwnedByUser, writeUserSpecificData, updateAdminSettings, readAdminData, invalidateCache, readData, deduplicateItems, cleanupDuplicateData, writeData, cleanupForeignUserData, updateData } = require('./data-service');
 const { streamChat, buildSimpleReply } = require('./xilian-agent');
 
+// ★ 提醒模块（主进程收口：数据/频率/调度/执行/IPC）——模块异常不影响应用启动
+let reminderManager = null;
+try {
+  reminderManager = require('./reminder-manager');
+} catch (e) {
+  safeError('[提醒] reminder-manager 加载失败:', e);
+}
+
 let lastBackupTime = 0;
 let lastBackupHash = '';
 
@@ -375,6 +383,15 @@ function createMainWindow() {
 
   mainWindow.on('hide', () => {
     mainWindow.setSkipTaskbar(true);
+  });
+
+  // ★ 主窗口获得焦点时取消任务栏闪烁（提醒触发 flashFrame 后用户点开窗口即停止）
+  mainWindow.on('focus', () => {
+    try {
+      mainWindow.flashFrame(false);
+    } catch (e) {
+      safeLog('[提醒] 取消任务栏闪烁失败: ' + e.message);
+    }
   });
 }
 
@@ -4813,6 +4830,20 @@ ipcMain.handle('cloud-sync-check', async () => {
     };
 
     try {
+      // ★ 注入当前会话频道上下文，供 xilian-tools 的 createReminder 等工具读取（参照 creator 注入机制）
+      try {
+        const chatState = currentData.settings?.chatRoomState || {};
+        const presetByName = (currentData.settings?.aiPresets || []).find(p => p.name === mergedConfig.agentName);
+        const activePresetId = presetByName ? presetByName.id : (settings.aiCurrentPresetId || 'default');
+        global._currentAIAgentChannel = {
+          targetType: chatState.isRoomMode && chatState.roomId ? 'room' : 'private',
+          targetId: chatState.isRoomMode && chatState.roomId ? chatState.roomId : activePresetId,
+          agentPresetId: activePresetId
+        };
+      } catch (e) {
+        safeLog('[提醒] 注入频道上下文失败: ' + e.message);
+      }
+
       // 创建新的 AbortController，保存引用供停止按钮使用
       chatStreamAbortController = new AbortController();
       const signal = chatStreamAbortController.signal;
@@ -5273,6 +5304,28 @@ async function scheduleEmptyDirCleanup() {
   cleanupEmptyDirsInterval = setInterval(cleanupTask, 4 * 60 * 60 * 1000);
 }
 
+// ★ 单实例锁：关闭窗口仅隐藏（托盘常驻），用户易在不知情时多开实例，
+//   多个实例同时读写 data.json 会互相覆盖，且旧实例可能运行修复前的旧代码（如提醒删除 IPC 缺失）。
+//   抢锁失败 → 本实例直接退出；二次启动 → 聚焦已有实例主窗口。
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  safeLog('[启动] 检测到已有 Elysia 实例在运行，本实例自动退出');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    safeLog('[启动] 收到二次启动请求，聚焦已有实例主窗口');
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    } catch (e) {
+      safeError('[启动] 聚焦已有窗口失败:', e);
+    }
+  });
+}
+
 app.whenReady().then(() => {
   cleanupForeignUserData();
   
@@ -5288,12 +5341,32 @@ app.whenReady().then(() => {
   setupAutoLaunch();
   setupIpcHandlers();
 
+  // ★ 提醒触发成功 → 任务栏闪烁（回调注册；模块缺失/异常不影响应用启动）
+  if (reminderManager && typeof reminderManager.setOnReminderFired === 'function') {
+    try {
+      reminderManager.setOnReminderFired(() => {
+        try {
+          if (mainWindow && !mainWindow.isDestroyed()) mainWindow.flashFrame(true);
+        } catch (e) {
+          safeLog('[提醒] flashFrame 失败: ' + e.message);
+        }
+      });
+    } catch (e) {
+      safeError('[提醒] 注册 reminder-fired 回调失败:', e);
+    }
+  }
+
   // MC 后端集成（失败不影响 Elysia 主流程）
   // ★ 先尝试从百度网盘恢复 sanctuary.db（如果云端版本更新）
   try { restoreMCDbFromCloud(); } catch(_) {}
   try { require('./mc-bridge').initMC(); } catch(e){ console.error('[MC] init skipped:', e.message); }
 
   checkInterval = setTimeout(() => checkReminders(), 30000);
+  
+  // ★ 提醒调度器启动（独立于任务截止弹窗 checkReminders；30s tick）
+  if (reminderManager && typeof reminderManager.startReminderScheduler === 'function') {
+    try { reminderManager.startReminderScheduler(); } catch (e) { safeError('[提醒] 启动调度器失败:', e); }
+  }
   
   scheduleEmptyDirCleanup();
 

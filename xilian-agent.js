@@ -467,6 +467,15 @@ function _buildModifyFallback(userText, aiText) {
 }
 
 async function _fallbackExtractAndExecute(finalContent, messages, config, confirmCallback) {
+  // ★ BugFix：调用方显式禁用工具（tools=[] 或 toolChoice='none'，如提醒执行器）时，
+  // 一律跳过兜底提取执行（双保险：防止其它调用路径遗漏）。返回 null 表示"不执行任何兜底操作"。
+  // 正常聊天不传 tools/toolChoice → toolsDisabled=false，兜底行为完全不变。
+  const toolsDisabled = (Array.isArray(config?.tools) && config.tools.length === 0) || config?.toolChoice === 'none';
+  if (toolsDisabled) {
+    safeLog('[昔涟] 兜底提取已跳过：调用方显式禁用工具（tools=[] 或 toolChoice=none）');
+    return null;
+  }
+
   const lastUserMsg = messages.filter(m => m.role === 'user').pop();
   const userText = (lastUserMsg?.content || '').toLowerCase();
   const aiText = finalContent || '';
@@ -661,7 +670,13 @@ async function streamChat(chatHistory, userConfig, callbacks) {
       }
 
       // ★ 终极兜底：从 AI 回复中提取内容自动执行对应的工具
-      const fallbackToolCall = await _fallbackExtractAndExecute(finalContent, currentMessages, config, callbacks?.onConfirmDelete);
+      // ★ BugFix：调用方显式禁用工具（tools=[] 或 toolChoice='none'，如提醒执行器）时
+      // 跳过兜底执行——提醒文本可能含"任务/备忘/记账"等词，不能据此自动创建/修改数据。
+      // 正常聊天不传 tools/toolChoice → toolsDisabled=false，兜底行为保持不变。
+      const toolsDisabled = (Array.isArray(config.tools) && config.tools.length === 0) || config.toolChoice === 'none';
+      const fallbackToolCall = toolsDisabled
+        ? null
+        : await _fallbackExtractAndExecute(finalContent, currentMessages, config, callbacks?.onConfirmDelete);
       if (fallbackToolCall) {
         try {
           safeLog(`[昔涟] 执行兜底工具调用: ${fallbackToolCall.function.name}`);
@@ -996,8 +1011,11 @@ async function callDeepSeekAPI(messages, config, onContent, externalSignal) {
 
   const body = {
     model, messages,
-    tools: TOOL_DEFINITIONS,
-    tool_choice: 'auto',
+    // ★ BugFix：工具列表与 tool_choice 可由调用方通过 config.tools / config.toolChoice 覆盖。
+    // 未传时保持原行为（全部工具 + auto），正常聊天不受影响；
+    // 提醒执行器等需要"纯文本输出"的场景传 tools:[] + toolChoice:'none' 以禁止工具调用。
+    tools: config.tools !== undefined ? config.tools : TOOL_DEFINITIONS,
+    tool_choice: config.toolChoice || 'auto',
     temperature: config.temperature ?? 1.0,
     stream: true
   };
@@ -1061,8 +1079,10 @@ async function callDeepSeekAPINonStream(messages, config, externalSignal) {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
         model, messages,
-        tools: TOOL_DEFINITIONS,
-        tool_choice: 'auto',
+        // ★ BugFix：同 callDeepSeekAPI，支持 config.tools / config.toolChoice 覆盖。
+        // 未传时保持原行为（全部工具 + auto），正常聊天不受影响。
+        tools: config.tools !== undefined ? config.tools : TOOL_DEFINITIONS,
+        tool_choice: config.toolChoice || 'auto',
         temperature: config.temperature ?? 1.0,
         stream: false
       }),
@@ -1233,5 +1253,7 @@ module.exports = {
   buildMessages,
   ChatMessage,
   DEFAULT_CONFIG,
-  DEFAULT_SYSTEM_PROMPT
+  DEFAULT_SYSTEM_PROMPT,
+  // ★ 导出兜底提取函数供单测（QA 回归：tools=[] / toolChoice='none' 时必须返回 null）
+  _fallbackExtractAndExecute
 };

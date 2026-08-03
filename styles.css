@@ -12052,3 +12052,374 @@ body {
   color: white;
 }
 
+
+/* ============================================================
+   提醒模块（reminder-ui.js）
+   ============================================================ */
+
+/* 昔涟导航红点（提醒触发后闪烁；进入昔涟视图时隐藏） */
+.xilian-notify-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e74c3c;
+  pointer-events: none;
+  animation: xilianNotifyBlink 1s ease-in-out infinite;
+}
+@keyframes xilianNotifyBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+.nav-item {
+  position: relative;
+}
+
+/* 列表页工具栏 */
+.reminders-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08));
+}
+.reminders-toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reminders-title-text {
+  font-size: 16px;
+  font-weight: 600;
+}
+.reminders-subtitle {
+  font-size: 12px;
+  color: #888;
+  margin-left: 6px;
+}
+
+/* 列表容器 */
+.reminders-list {
+  padding: 14px 18px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.reminders-empty {
+  margin-top: 60px;
+  text-align: center;
+}
+
+/* 提醒卡片 */
+.reminder-card {
+  border: 1px solid var(--border-color, rgba(0,0,0,.1));
+  border-radius: 10px;
+  background: var(--card-bg, #fff);
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  transition: box-shadow .15s ease;
+}
+.reminder-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.reminder-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.reminder-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-color, #333);
+}
+.reminder-agent-tag {
+  font-size: 11px;
+  color: #7c5cff;
+  background: rgba(124,92,255,.1);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.reminder-prompt-tag {
+  font-size: 11px;
+  color: #d48806;
+  background: rgba(212,136,6,.1);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.reminder-status-badge {
+  margin-left: auto;
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+}
+.reminder-status-badge.status-pending {
+  color: #1a9e4b;
+  background: rgba(26,158,75,.1);
+  border-color: rgba(26,158,75,.35);
+}
+.reminder-status-badge.status-triggered {
+  color: #888;
+  background: rgba(136,136,136,.1);
+  border-color: rgba(136,136,136,.3);
+}
+.reminder-status-badge.status-paused {
+  color: #888;
+  background: transparent;
+  border-color: rgba(136,136,136,.4);
+}
+.reminder-status-badge.status-expired {
+  color: #d48806;
+  background: rgba(212,136,6,.1);
+  border-color: rgba(212,136,6,.35);
+}
+.reminder-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #666;
+}
+.reminder-card-next {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #999;
+}
+
+/* 执行历史 */
+.reminder-card-history {
+  margin-top: 8px;
+  border-top: 1px dashed var(--border-color, rgba(0,0,0,.08));
+  padding-top: 6px;
+}
+.reminder-history-toggle {
+  font-size: 12px;
+  color: #7c5cff;
+  cursor: pointer;
+  user-select: none;
+}
+.reminder-history-toggle:hover {
+  text-decoration: underline;
+}
+.reminder-history-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.reminder-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #666;
+}
+.reminder-history-status {
+  flex: none;
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 0 6px;
+}
+.reminder-history-status.hs-ok {
+  color: #1a9e4b;
+  background: rgba(26,158,75,.1);
+}
+.reminder-history-status.hs-degraded {
+  color: #d48806;
+  background: rgba(212,136,6,.1);
+}
+.reminder-history-status.hs-failed {
+  color: #e74c3c;
+  background: rgba(231,76,60,.1);
+}
+.reminder-history-agent {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reminder-history-time {
+  flex: none;
+  color: #aaa;
+}
+
+/* 卡片操作按钮 */
+.reminder-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.reminder-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, rgba(0,0,0,.15));
+  background: var(--card-bg, #fff);
+  color: var(--text-color, #444);
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.reminder-btn:hover {
+  background: rgba(124,92,255,.08);
+  border-color: rgba(124,92,255,.4);
+}
+.reminder-btn-danger {
+  color: #e74c3c;
+}
+.reminder-btn-danger:hover {
+  background: rgba(231,76,60,.08);
+  border-color: rgba(231,76,60,.4);
+}
+
+/* 表单弹窗 */
+.reminder-modal-content {
+  max-width: 560px;
+  width: 92%;
+  max-height: 86vh;
+}
+.reminder-schedule-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.reminder-tab {
+  font-size: 13px;
+  padding: 5px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, rgba(0,0,0,.15));
+  background: var(--card-bg, #fff);
+  color: var(--text-color, #555);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.reminder-tab.active {
+  background: rgba(124,92,255,.12);
+  border-color: rgba(124,92,255,.5);
+  color: #5b3df5;
+  font-weight: 600;
+}
+.reminder-schedule-panel {
+  margin-top: 4px;
+}
+.reminder-period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.reminder-period-option {
+  font-size: 13px;
+  padding: 7px 0;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, rgba(0,0,0,.15));
+  background: var(--card-bg, #fff);
+  color: var(--text-color, #555);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.reminder-period-option.active {
+  background: rgba(124,92,255,.12);
+  border-color: rgba(124,92,255,.5);
+  color: #5b3df5;
+  font-weight: 600;
+}
+.reminder-period-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.reminder-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.reminder-detail-label {
+  font-size: 13px;
+  color: #666;
+  flex: none;
+}
+.reminder-time-input,
+.reminder-datetime-input,
+.reminder-date-input {
+  width: auto;
+  flex: none;
+}
+.reminder-num-input {
+  width: 80px;
+  flex: none;
+}
+.reminder-select-input {
+  width: auto;
+  flex: none;
+  min-width: 120px;
+}
+.reminder-weekday-group {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.reminder-weekday-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: #555;
+  cursor: pointer;
+  border: 1px solid var(--border-color, rgba(0,0,0,.12));
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: var(--card-bg, #fff);
+  transition: all .15s ease;
+}
+.reminder-weekday-group label:has(input:checked) {
+  background: rgba(124,92,255,.12);
+  border-color: rgba(124,92,255,.5);
+  color: #5b3df5;
+}
+.reminder-weekday-group input[type="checkbox"] {
+  accent-color: #7c5cff;
+}
+
+/* 表单错误 / 提示 */
+.form-error {
+  color: #e74c3c;
+  font-size: 12px;
+  margin-top: 4px;
+  min-height: 0;
+}
+.form-hint {
+  color: #999;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.form-input.input-error,
+.form-textarea.input-error {
+  border-color: #e74c3c !important;
+}
+.reminder-notify-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.reminder-notify-label input[type="checkbox"] {
+  accent-color: #7c5cff;
+}
+.reminder-notify-detail {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-color, rgba(0,0,0,.15));
+  border-radius: 8px;
+  background: rgba(124,92,255,.03);
+}

@@ -11,6 +11,7 @@ const { SecretManager } = require('./secret-manager.js');
 const { JournalManager } = require('./journal-manager.js');
 const { ThemeManager } = require('./theme-manager.js');
 const { SettingsManager } = require('./settings-manager.js');
+const { ReminderUI } = require('./reminder-ui.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 星图自动刷新：后台 Scribe/Archivist 抽取碎片/星座写入数据库后，
@@ -73,6 +74,7 @@ class AppController {
     this.journalManager = new JournalManager(this);
     this.themeManager = new ThemeManager(this);
     this.settingsManager = new SettingsManager(this);
+    this.reminderUI = new ReminderUI(this);
     this.xilianManager = getXilianManager(this);
     window.xilianManager = this.xilianManager; // 暴露全局，供星图"录入当前对话"按钮调用
     // 暴露全局，供星图"录入当前对话"按钮调用；录入后强制下次轮询刷新星图
@@ -210,6 +212,9 @@ class AppController {
 
     // ── 步骤8：creator 标签迁移（最多一次）──
     try { await this._runCreatorMigration(); } catch (e) { console.error('[CreatorTag]', e); }
+
+    // ── 步骤8.5：初始化提醒模块（列表/表单/角标；调度器由主进程负责）──
+    try { this.reminderUI.init(); } catch (e) { console.error('[onDOMReady] reminderUI.init 失败:', e); }
 
     // 兜底：确保视图正确
     this.switchView('xilian');
@@ -2277,6 +2282,9 @@ class AppController {
     }
     
     if (view === 'xilian') {
+      // ★ 进入昔涟视图时隐藏提醒触发红点（元素不存在时容错）
+      const notifyDot = document.getElementById('xilianNotifyDot');
+      if (notifyDot) notifyDot.style.display = 'none';
       this.xilianManager.onViewActivated();
     }
 
@@ -5686,6 +5694,14 @@ class AppController {
       await this.loadJournals();
       this.renderJournalCalendar();
       this.loadJournalForDate(this.selectedDateStr);
+    });
+
+    ipcRenderer.on('reminders-updated', async () => {
+      try {
+        await this.reminderUI.loadList();
+      } catch (e) {
+        console.error('[reminders-updated] 刷新提醒列表失败:', e);
+      }
     });
 
     ipcRenderer.on('data-changed', () => {

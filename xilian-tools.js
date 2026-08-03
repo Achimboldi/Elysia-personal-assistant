@@ -671,13 +671,105 @@ const TOOL_DEFINITIONS = [
         required: ['content', 'changeNote']
       }
     }
+  },
+  // ========== 提醒管理 (4) ==========
+  {
+    type: 'function',
+    function: {
+      name: 'createReminder',
+      description: '创建一个定时提醒。当用户说"提醒我/定时/每天X点/每周X/每隔X分钟提醒"等时使用。schedule 支持 8 种类型：daily(每天,{time:"HH:mm"})、weekly(每周若干天,{weekday:[0-6],time})、workday(工作日,{time})、restday(休息日,{time})、monthly(每月固定日,{dayOfMonth:1-31,time})、yearly(每年,{month:1-12,dayOfMonth,time})、interval(固定间隔,{intervalMinutes,startAt?})、once(单次,{datetime:"YYYY-MM-DDTHH:mm:ss"})。',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '提醒名称（必填，1-50字）' },
+          prompt: { type: 'string', description: '提示词：到点时智能体按此内容生成回复；留空则只发系统提醒消息' },
+          schedule: {
+            type: 'object',
+            description: '执行频率规则（必填），见工具说明中的 8 种类型格式',
+            properties: {
+              type: { type: 'string', enum: ['daily', 'weekly', 'workday', 'restday', 'monthly', 'yearly', 'interval', 'once'] },
+              time: { type: 'string', description: '触发时间 HH:mm' },
+              weekday: { type: 'array', items: { type: 'number' }, description: '每周星期几，0=周日，如 [1,3,5] 表示周一三五' },
+              dayOfMonth: { type: 'number', description: '每月第几天，1-31，超限取当月最后一天' },
+              month: { type: 'number', description: '每年第几个月，1-12' },
+              intervalMinutes: { type: 'number', description: '间隔分钟数，如 90 表示每90分钟' },
+              startAt: { type: 'string', description: '间隔起始时间 ISO，如 2026-08-01T08:00:00' },
+              datetime: { type: 'string', description: '单次触发时间 ISO，如 2026-08-01T09:00:00' }
+            },
+            required: ['type']
+          },
+          dateRange: {
+            type: 'object',
+            description: '生效日期区间（选填，null=不限）',
+            properties: {
+              start: { type: 'string', description: '开始日期 YYYY-MM-DD' },
+              end: { type: 'string', description: '结束日期 YYYY-MM-DD' }
+            }
+          },
+          notifyEnabled: { type: 'boolean', description: '是否需要额外提醒' },
+          notifyTime: { type: 'string', description: '提醒时间 HH:mm（notifyEnabled 时必填）' },
+          notifyWeekday: { type: 'array', items: { type: 'number' }, description: '提醒频率星期，空=每天' }
+        },
+        required: ['name', 'schedule']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'listReminders',
+      description: '列出所有提醒。用户问"有哪些提醒"、"查看提醒"、"我的提醒"时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: '返回条数限制，默认20' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'updateReminder',
+      description: '更新已有提醒（名称/提示词/频率/开关等，可覆盖全部字段）。用户说"修改提醒"、"把提醒改成..."时使用。先通过 listReminders 获取提醒ID。',
+      parameters: {
+        type: 'object',
+        properties: {
+          reminderId: { type: 'string', description: '要更新的提醒ID（必填）' },
+          name: { type: 'string', description: '新名称' },
+          prompt: { type: 'string', description: '新提示词' },
+          schedule: { type: 'object', description: '新执行频率，格式同 createReminder 的 schedule' },
+          dateRange: { type: 'object', description: '新生效日期区间' },
+          notifyEnabled: { type: 'boolean' },
+          notifyTime: { type: 'string', description: '提醒时间 HH:mm' },
+          notifyWeekday: { type: 'array', items: { type: 'number' } },
+          enabled: { type: 'boolean', description: '是否启用（false=暂停）' }
+        },
+        required: ['reminderId']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'deleteReminder',
+      description: '删除一个提醒。⚠️ 需要用户确认。如果不确定提醒ID，请先调用 listReminders 查看。',
+      parameters: {
+        type: 'object',
+        properties: {
+          reminderId: { type: 'string', description: '要删除的提醒ID（必填）' },
+          reminderName: { type: 'string', description: '提醒名称（用于确认提示）' }
+        },
+        required: ['reminderId']
+      }
+    }
   }
 ];
 
 // ============================================================
 // CONFIRM-REQUIRED TOOLS
 // ============================================================
-const TOOLS_REQUIRING_CONFIRM = ['deleteTask', 'deleteMemo', 'deleteExpense', 'writeAppFile', 'updateAgentRules'];
+const TOOLS_REQUIRING_CONFIRM = ['deleteTask', 'deleteMemo', 'deleteExpense', 'deleteReminder', 'writeAppFile', 'updateAgentRules'];
 
 // ============================================================
 // TOOL EXECUTION DISPATCH
@@ -736,8 +828,8 @@ async function executeToolCall(toolCall, confirmCallback) {
       confirmId = 'ai-config/agent-rules.md';
       confirmTitle = args.changeNote || '';
     } else {
-      const idField = name === 'deleteTask' ? 'taskId' : name === 'deleteMemo' ? 'memoId' : 'expenseId';
-      const titleField = name === 'deleteTask' ? 'taskTitle' : name === 'deleteMemo' ? 'memoTitle' : 'expenseDetail';
+      const idField = name === 'deleteTask' ? 'taskId' : name === 'deleteMemo' ? 'memoId' : name === 'deleteReminder' ? 'reminderId' : 'expenseId';
+      const titleField = name === 'deleteTask' ? 'taskTitle' : name === 'deleteMemo' ? 'memoTitle' : name === 'deleteReminder' ? 'reminderName' : 'expenseDetail';
       confirmId = args[idField];
       confirmTitle = args[titleField] || '';
     }
@@ -757,6 +849,8 @@ async function executeToolCall(toolCall, confirmCallback) {
     getSettings, updateSettings, switchUser,
     triggerSync, getSyncStatus,
     getDashboard,
+    // ★ 提醒工具
+    createReminder, listReminders, updateReminder, deleteReminder,
     // ★ 自我迭代工具
     listAppFiles, readAppFile, searchAppCode, runNodeCheck, writeAppFile, updateAgentRules
   };
@@ -1916,6 +2010,122 @@ async function updateAgentRules(args) {
 }
 
 // ============================================================
+// 提醒工具（代理 reminder-manager，单点写入，不绕 IPC）
+// ============================================================
+
+/**
+ * 懒加载 reminder-manager（主进程内直调内部函数）
+ */
+function _getReminderModule() {
+  try {
+    return require('./reminder-manager');
+  } catch (e) {
+    safeError('[提醒工具] reminder-manager 加载失败:', e);
+    return null;
+  }
+}
+
+/**
+ * 解析当前会话频道上下文（参照 creator 注入机制：main.js chat-start-stream 设置
+ * global._currentAIAgentChannel；缺省回退当前活跃预设）
+ */
+function _resolveReminderChannel() {
+  const ctx = (typeof global !== 'undefined' && global._currentAIAgentChannel) || {};
+  const data = readData();
+  const settings = data.settings || {};
+  const presets = settings.aiPresets || [];
+  const currentPresetId = settings.aiCurrentPresetId || (presets[0] && presets[0].id) || 'default';
+  if (ctx.targetType === 'room' && ctx.targetId) {
+    return { targetType: 'room', targetId: ctx.targetId, agentPresetId: ctx.agentPresetId || currentPresetId };
+  }
+  const targetId = ctx.targetId || currentPresetId;
+  return { targetType: 'private', targetId, agentPresetId: targetId };
+}
+
+function _formatReminderNext(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+async function createReminder(args) {
+  const rm = _getReminderModule();
+  if (!rm) return { message: '提醒模块未就绪，请重启应用后重试' };
+  const channel = _resolveReminderChannel();
+  const result = await rm.saveReminder({
+    name: args.name,
+    prompt: args.prompt || '',
+    schedule: args.schedule || {},
+    dateRange: args.dateRange || null,
+    notifyEnabled: !!args.notifyEnabled,
+    notifyTime: args.notifyTime || '',
+    notifyWeekday: args.notifyWeekday || [],
+    targetType: channel.targetType,
+    targetId: channel.targetId,
+    agentPresetId: channel.agentPresetId,
+    createdBy: 'agent'
+  });
+  if (!result.success) return { message: `创建提醒失败：${result.message}` };
+  const freqText = rm.describeSchedule ? rm.describeSchedule(result.reminder.schedule) : (result.reminder.schedule.type || '');
+  return {
+    message: `✅ 已创建提醒「${result.reminder.name}」\n频率：${freqText}\n下次触发：${_formatReminderNext(result.reminder.nextTriggerAt)}`,
+    data: { id: result.reminder.id, name: result.reminder.name, nextTriggerAt: result.reminder.nextTriggerAt }
+  };
+}
+
+async function listReminders(args) {
+  const rm = _getReminderModule();
+  if (!rm) return { message: '提醒模块未就绪，请重启应用后重试' };
+  const reminders = rm.listReminders();
+  if (!reminders || reminders.length === 0) return { message: '当前没有任何提醒。' };
+  const limit = (args && args.limit) || 20;
+  const rows = reminders.slice(0, limit).map(r => {
+    const status = r.enabled === false ? '已停用' : (r.nextTriggerAt ? '待触发' : '已过期');
+    const freq = rm.describeSchedule ? rm.describeSchedule(r.schedule) : (r.schedule && r.schedule.type) || '';
+    return `- [${status}] ${r.name}（${freq}，下次: ${_formatReminderNext(r.nextTriggerAt)}）`;
+  });
+  return {
+    message: `共有 ${reminders.length} 条提醒：\n${rows.join('\n')}`,
+    data: { reminders: reminders.slice(0, limit).map(r => ({ id: r.id, name: r.name, enabled: r.enabled, nextTriggerAt: r.nextTriggerAt })), total: reminders.length }
+  };
+}
+
+async function updateReminder(args) {
+  const rm = _getReminderModule();
+  if (!rm) return { message: '提醒模块未就绪，请重启应用后重试' };
+  const existing = rm.listReminders().find(r => String(r.id) === String(args.reminderId));
+  if (!existing) return { message: `未找到提醒 ID: ${args.reminderId}` };
+  const patch = {};
+  if (args.name !== undefined) patch.name = args.name;
+  if (args.prompt !== undefined) patch.prompt = args.prompt;
+  if (args.schedule !== undefined) patch.schedule = args.schedule;
+  if (args.dateRange !== undefined) patch.dateRange = args.dateRange;
+  if (args.notifyEnabled !== undefined) patch.notifyEnabled = args.notifyEnabled;
+  if (args.notifyTime !== undefined) patch.notifyTime = args.notifyTime;
+  if (args.notifyWeekday !== undefined) patch.notifyWeekday = args.notifyWeekday;
+  if (args.enabled !== undefined) patch.enabled = args.enabled;
+  const result = await rm.saveReminder({ ...existing, ...patch });
+  if (!result.success) return { message: `更新提醒失败：${result.message}` };
+  return {
+    message: `✅ 已更新提醒「${result.reminder.name}」，下次触发：${_formatReminderNext(result.reminder.nextTriggerAt)}`,
+    data: { id: result.reminder.id, name: result.reminder.name, nextTriggerAt: result.reminder.nextTriggerAt }
+  };
+}
+
+async function deleteReminder(args) {
+  const rm = _getReminderModule();
+  if (!rm) return { message: '提醒模块未就绪，请重启应用后重试' };
+  const result = await rm.deleteReminder(args.reminderId);
+  return {
+    message: result.success ? `✅ 已删除提醒「${args.reminderName || ''}」` : `删除提醒失败：${result.message}`,
+    data: { id: args.reminderId }
+  };
+}
+
+// ============================================================
 // MODULE EXPORTS
 // ============================================================
 module.exports = {
@@ -1931,6 +2141,8 @@ module.exports = {
   getSettings, updateSettings, switchUser,
   triggerSync, getSyncStatus,
   getDashboard,
+  // ★ 提醒工具
+  createReminder, listReminders, updateReminder, deleteReminder,
   // ★ 自我迭代工具
   listAppFiles, readAppFile, searchAppCode, runNodeCheck, writeAppFile, updateAgentRules
 };

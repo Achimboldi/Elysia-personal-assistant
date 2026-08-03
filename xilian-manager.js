@@ -304,10 +304,16 @@ class XilianManager {
             }
         });
 
-        // ★ 云端下载后刷新聊天记录：确保其他设备下载到的聊天记录能立即显示
+        // ★ 云端下载/提醒触发后刷新聊天记录：确保其他设备或提醒落库的消息能立即显示
         ipcRenderer.on('chat-history-updated', () => {
             if (this.isViewActive()) {
-                this.loadHistory();
+                this.loadHistory().then(() => {
+                    // 流式输出中不重建 DOM，避免销毁正在显示的流式内容
+                    if (!this.isStreaming) {
+                        XilianUI.renderMessages(this.chatHistory);
+                        XilianUI.scrollToBottom();
+                    }
+                }).catch(e => console.warn('[昔涟] chat-history-updated 刷新失败:', e));
             }
         });
 
@@ -1132,12 +1138,18 @@ class XilianManager {
     // 视图激活/停用
     // ============================================================
 
-    onViewActivated() {
+    async onViewActivated() {
         // ★ 修复：流式输出时不要重建 DOM，否则会销毁正在显示的流式内容
         if (this.isStreaming) {
             XilianUI.scrollToBottom();
             XilianUI.focusInput();
             return;
+        }
+        // ★ 切回昔涟视图时重新加载聊天历史，确保提醒触发等后台写入的消息可见
+        try {
+            await this.loadHistory();
+        } catch (e) {
+            console.warn('[昔涟] 视图激活加载历史失败:', e);
         }
         XilianUI.renderMessages(this.chatHistory);
         XilianUI.scrollToBottom();

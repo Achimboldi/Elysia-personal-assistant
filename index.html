@@ -77,6 +77,7 @@
             <div class="left-nav">
                 <div class="nav-item nav-item-xilian active" data-view="xilian">
                     <span class="nav-text">昔涟</span>
+                    <span class="xilian-notify-dot" id="xilianNotifyDot" style="display:none;"></span>
                 </div>
                 <div class="nav-item" data-view="tasks">
                     <span class="nav-text">任务</span>
@@ -86,6 +87,9 @@
                 </div>
                 <div class="nav-item" data-view="secrets">
                     <span class="nav-text">密钥</span>
+                </div>
+                <div class="nav-item" data-view="reminders" id="remindersNavItem">
+                    <span class="nav-text">提醒</span>
                 </div>
                 <div class="nav-item" data-view="journal">
                     <span class="nav-text">日志</span>
@@ -266,6 +270,22 @@
                                         <textarea id="journalContent" class="journal-textarea" placeholder="记录今天的心情和事情..."></textarea>
                                         <span id="journalWordCount" class="word-count">0 字</span>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 提醒视图 -->
+                        <div id="remindersView" class="view-panel">
+                            <div class="reminders-toolbar">
+                                <div class="reminders-toolbar-title">
+                                    <span class="reminders-title-text">提醒</span>
+                                    <span class="reminders-subtitle">到点自动触发 · 可绑定智能体按提示词执行</span>
+                                </div>
+                                <button id="addReminderBtn" class="add-task-btn panel-add-btn" title="新建提醒">+</button>
+                            </div>
+                            <div id="remindersList" class="reminders-list">
+                                <div class="empty-state reminders-empty">
+                                    <div>暂无提醒</div>
+                                    <div class="empty-tip">点击右上角「新建提醒」，或在聊天中对昔涟说「每天9点提醒我…」</div>
                                 </div>
                             </div>
                         </div>
@@ -903,6 +923,151 @@
             <div class="modal-footer">
                 <button class="btn-secondary" id="deleteSecretBtn" style="display: none;">删除</button>
                 <button class="btn-primary" id="saveSecretBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提醒编辑弹窗 -->
+    <div id="reminderModal" class="modal" style="display: none;">
+        <div class="modal-content reminder-modal-content">
+            <div class="modal-header">
+                <h3 id="reminderModalTitle">新建提醒</h3>
+                <button class="modal-close" id="closeReminderModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">名称 <span class="required">*</span></label>
+                    <input type="text" id="reminderName" class="form-input" placeholder="例如：喝水提醒" maxlength="50">
+                    <div class="form-error" id="reminderNameError"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">提示词</label>
+                    <textarea id="reminderPrompt" class="form-textarea" rows="3" placeholder="留空时到点只发系统提醒消息；填写后智能体会按提示词主动生成内容"></textarea>
+                    <div class="form-hint">留空时到点只发系统提醒消息；填写后智能体会按提示词主动生成内容</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">执行频率 <span class="required">*</span></label>
+                    <div class="reminder-schedule-tabs">
+                        <button type="button" class="reminder-tab active" data-schedule-type="period">周期</button>
+                        <button type="button" class="reminder-tab" data-schedule-type="interval">按间隔</button>
+                        <button type="button" class="reminder-tab" data-schedule-type="once">单次</button>
+                    </div>
+                    <div class="reminder-schedule-panel" id="reminderPeriodPanel">
+                        <div class="reminder-period-grid">
+                            <button type="button" class="reminder-period-option active" data-period="daily">每天</button>
+                            <button type="button" class="reminder-period-option" data-period="weekly">每周</button>
+                            <button type="button" class="reminder-period-option" data-period="workday">工作日</button>
+                            <button type="button" class="reminder-period-option" data-period="restday">休息日</button>
+                            <button type="button" class="reminder-period-option" data-period="monthly">每月</button>
+                            <button type="button" class="reminder-period-option" data-period="yearly">每年</button>
+                        </div>
+                        <div class="reminder-period-detail">
+                            <div class="reminder-detail-row" id="reminderTimeRow">
+                                <span class="reminder-detail-label">时间</span>
+                                <input type="time" id="reminderTime" value="09:00" class="form-input reminder-time-input">
+                            </div>
+                            <div class="reminder-detail-row" id="reminderWeekdayRow" style="display:none;">
+                                <span class="reminder-detail-label">星期</span>
+                                <div class="reminder-weekday-group" id="reminderWeekdayGroup">
+                                    <label><input type="checkbox" value="1">一</label>
+                                    <label><input type="checkbox" value="2">二</label>
+                                    <label><input type="checkbox" value="3">三</label>
+                                    <label><input type="checkbox" value="4">四</label>
+                                    <label><input type="checkbox" value="5">五</label>
+                                    <label><input type="checkbox" value="6">六</label>
+                                    <label><input type="checkbox" value="0">日</label>
+                                </div>
+                                <span class="reminder-detail-label">时间</span>
+                                <input type="time" id="reminderWeeklyTime" value="09:00" class="form-input reminder-time-input">
+                            </div>
+                            <div class="reminder-detail-row" id="reminderMonthlyRow" style="display:none;">
+                                <span class="reminder-detail-label">每月第</span>
+                                <input type="number" id="reminderMonthDay" min="1" max="31" value="1" class="form-input reminder-num-input">
+                                <span class="reminder-detail-label">天</span>
+                                <input type="time" id="reminderMonthlyTime" value="09:00" class="form-input reminder-time-input">
+                            </div>
+                            <div class="reminder-detail-row" id="reminderYearlyRow" style="display:none;">
+                                <span class="reminder-detail-label">每年</span>
+                                <input type="number" id="reminderYearMonth" min="1" max="12" value="1" class="form-input reminder-num-input">
+                                <span class="reminder-detail-label">月</span>
+                                <input type="number" id="reminderYearDay" min="1" max="31" value="1" class="form-input reminder-num-input">
+                                <span class="reminder-detail-label">日</span>
+                                <input type="time" id="reminderYearlyTime" value="09:00" class="form-input reminder-time-input">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="reminder-schedule-panel" id="reminderIntervalPanel" style="display:none;">
+                        <div class="reminder-detail-row">
+                            <span class="reminder-detail-label">每</span>
+                            <input type="number" id="reminderIntervalMinutes" min="1" max="10080" value="90" class="form-input reminder-num-input">
+                            <span class="reminder-detail-label">分钟</span>
+                        </div>
+                        <div class="reminder-detail-row">
+                            <span class="reminder-detail-label">从</span>
+                            <input type="datetime-local" id="reminderIntervalStart" class="form-input reminder-datetime-input">
+                            <span class="reminder-detail-label">开始</span>
+                        </div>
+                    </div>
+                    <div class="reminder-schedule-panel" id="reminderOncePanel" style="display:none;">
+                        <div class="reminder-detail-row">
+                            <span class="reminder-detail-label">于</span>
+                            <input type="datetime-local" id="reminderOnceDatetime" class="form-input reminder-datetime-input">
+                            <span class="reminder-detail-label">触发</span>
+                        </div>
+                    </div>
+                    <div class="form-error" id="reminderScheduleError"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">生效日期区间</label>
+                    <div class="reminder-detail-row">
+                        <span class="reminder-detail-label">从</span>
+                        <input type="date" id="reminderRangeStart" class="form-input reminder-date-input">
+                        <span class="reminder-detail-label">至</span>
+                        <input type="date" id="reminderRangeEnd" class="form-input reminder-date-input">
+                    </div>
+                    <div class="form-hint">选填，默认不限；开始日期不能晚于结束日期</div>
+                    <div class="form-error" id="reminderRangeError"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label reminder-notify-label">
+                        <input type="checkbox" id="reminderNotifyEnabled"> 是否需要提醒
+                    </label>
+                    <div class="reminder-notify-detail" id="reminderNotifyDetail" style="display:none;">
+                        <div class="reminder-detail-row">
+                            <span class="reminder-detail-label">提醒时间</span>
+                            <input type="time" id="reminderNotifyTime" value="09:00" class="form-input reminder-time-input">
+                        </div>
+                        <div class="reminder-detail-row">
+                            <span class="reminder-detail-label">频率</span>
+                            <select id="reminderNotifyFreq" class="form-input reminder-select-input">
+                                <option value="daily">每天</option>
+                                <option value="weekly">每周</option>
+                            </select>
+                        </div>
+                        <div class="reminder-detail-row" id="reminderNotifyWeekdayRow" style="display:none;">
+                            <span class="reminder-detail-label">星期</span>
+                            <div class="reminder-weekday-group" id="reminderNotifyWeekdayGroup">
+                                <label><input type="checkbox" value="1">一</label>
+                                <label><input type="checkbox" value="2">二</label>
+                                <label><input type="checkbox" value="3">三</label>
+                                <label><input type="checkbox" value="4">四</label>
+                                <label><input type="checkbox" value="5">五</label>
+                                <label><input type="checkbox" value="6">六</label>
+                                <label><input type="checkbox" value="0">日</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-error" id="reminderNotifyError"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">触发频道</label>
+                    <select id="reminderTargetSelect" class="form-input reminder-select-input"></select>
+                    <div class="form-hint">私聊频道 = 该智能体的人设；聊天室频道 = 房间内智能体按既有规则响应</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="deleteReminderBtn" style="display: none;">删除</button>
+                <button class="btn-primary" id="saveReminderBtn">保存</button>
             </div>
         </div>
     </div>
