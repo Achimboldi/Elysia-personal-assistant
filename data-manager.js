@@ -12,6 +12,16 @@ class DataManager {
     this.writeDebounceTimer = null;
     this.WRITE_DEBOUNCE_DELAY = 100;
     this.MAX_QUEUE_SIZE = 50;
+    this._opChain = Promise.resolve();
+  }
+
+  // ★ 操作串行化：保证 updateData 的"读-合并-写"与 flushWriteQueue 的写盘互斥，
+  //   消除并发编辑时读到磁盘中间状态导致新编辑被旧快照覆盖的竞态
+  _withOpLock(fn) {
+    const prev = this._opChain.catch(() => {});
+    let release;
+    this._opChain = new Promise(r => { release = r; });
+    return prev.then(() => fn()).finally(release);
   }
 
   async getDataFilePath(userId = null) {
@@ -579,10 +589,40 @@ class DataManager {
     this.writeQueue.push(writeItem);
 
     if (this.writeQueue.length >= this.MAX_QUEUE_SIZE) {
-      await this.flushWriteQueue();
+      // ★ 避免在 updateData 持锁期间等待 flush 造成死锁：队列满时异步触发，flush 内部自行等锁
+      this.flushWriteQueue().catch(() => {});
     } else {
       this.scheduleWrite();
     }
+  }
+
+  // ★ 获取"当前最新数据"：优先使用写队列中尚未落盘的最新快照，
+  //   避免后续编辑基于过期的磁盘状态合并，导致前面的修改被覆盖回退
+  async _getCurrentData() {
+    if (this.writeQueue.length > 0) {
+      const latest = this.writeQueue[this.writeQueue.length - 1];
+      let base = this.cachedData;
+      if (!base) {
+        try {
+          base = await this.readData();
+        } catch (e) {
+          base = {};
+        }
+      }
+      return {
+        ...(base || {}),
+        tasks: latest.tasks,
+        memos: latest.memos,
+        expenses: latest.expenses,
+        budgets: latest.budgets,
+        settings: latest.settings,
+        translationStats: latest.translationStats,
+        categoryBudgets: latest.categoryBudgets,
+        secrets: latest.secrets,
+        journals: latest.journals
+      };
+    }
+    return await this.readData();
   }
 
   scheduleWrite() {
@@ -595,31 +635,43 @@ class DataManager {
   }
 
   async flushWriteQueue() {
-    if (this.isWriting || this.writeQueue.length === 0) {
-      return;
-    }
+    return this._withOpLock(async () => {
+      if (this.isWriting || this.writeQueue.length === 0) {
+        return;
+      }
 
-    this.isWriting = true;
-    const queue = [...this.writeQueue];
-    this.writeQueue = [];
+      this.isWriting = true;
+      const queue = [...this.writeQueue];
+      this.writeQueue = [];
 
-    try {
-      const latestWrite = queue[queue.length - 1];
-      await this._writeData(
-        latestWrite.tasks,
-        latestWrite.memos,
-        latestWrite.expenses,
-        latestWrite.budgets,
-        latestWrite.settings,
-        latestWrite.translationStats,
-        latestWrite.categoryBudgets,
-        latestWrite.secrets,
-        latestWrite.journals,
-        latestWrite.updateDataModified
-      );
-    } finally {
-      this.isWriting = false;
-    }
+      try {
+        const latestWrite = queue[queue.length - 1];
+        // ★ 与 data-service.writeData 共享全局写锁：两套写入系统必须串行，
+        //   否则并发写盘会用旧快照互相覆盖（任务编辑回退根因之一）。
+        while (global._elysiaWriteLock) {
+          await new Promise(r => setTimeout(r, 10));
+        }
+        global._elysiaWriteLock = true;
+        try {
+          await this._writeData(
+            latestWrite.tasks,
+            latestWrite.memos,
+            latestWrite.expenses,
+            latestWrite.budgets,
+            latestWrite.settings,
+            latestWrite.translationStats,
+            latestWrite.categoryBudgets,
+            latestWrite.secrets,
+            latestWrite.journals,
+            latestWrite.updateDataModified
+          );
+        } finally {
+          global._elysiaWriteLock = false;
+        }
+      } finally {
+        this.isWriting = false;
+      }
+    });
   }
 
   async writeData(tasks, memos, expenses, budgets, settings, translationStats, categoryBudgets, secrets = [], journals = [], updateDataModified = false) {
@@ -629,6 +681,13 @@ class DataManager {
 
   async _writeData(tasks, memos, expenses, budgets, settings, translationStats, categoryBudgets, secrets = [], journals = [], updateDataModified = false) {
     await this.invalidateCache();
+    // ★ 双缓存联动：同时失效 data-service 缓存，防止对方用旧数据整表覆盖（任务优先级/提醒丢失根因）
+    try {
+      const { invalidateCache: invalidateDataServiceCache } = require('./data-service');
+      if (typeof invalidateDataServiceCache === 'function') {
+        invalidateDataServiceCache();
+      }
+    } catch (e) {}
 
     const dataPath = await this.getDataFilePath();
     const currentUserId = this.getCurrentUserId();
@@ -637,18 +696,40 @@ class DataManager {
       const exists = await fsp.access(dataPath).then(() => true).catch(() => false);
       const existingData = exists ? JSON.parse(await fsp.readFile(dataPath, 'utf8')) : null;
 
+      // ★ 写盘前合并保护：防止持有旧快照的写盘覆盖磁盘上更新的条目（任务优先级/进度/子任务回退根因）。
+      // 与 data-service.writeData 使用同一套规则，保证两个写入路径行为一致。
+      let mergeIncomingWithDisk = null;
+      try {
+        ({ mergeIncomingWithDisk } = require('./data-service'));
+      } catch (e) {}
+      const mergeColl = (incoming, diskItems, deletedIds) => {
+        if (typeof mergeIncomingWithDisk === 'function') {
+          return mergeIncomingWithDisk(incoming, diskItems, deletedIds);
+        }
+        return incoming;
+      };
+
       const data = {
-        tasks: tasks || [],
-        memos: memos || [],
-        expenses: expenses || [],
-        budgets: budgets || [],
-        categoryBudgets: categoryBudgets || [],
-        secrets: secrets || [],
-        journals: journals || [],
+        tasks: mergeColl(tasks !== undefined ? (tasks || []) : (existingData?.tasks || []), existingData?.tasks || [], existingData?.deletedItems?.tasks || []),
+        memos: mergeColl(memos !== undefined ? (memos || []) : (existingData?.memos || []), existingData?.memos || [], existingData?.deletedItems?.memos || []),
+        expenses: mergeColl(expenses !== undefined ? (expenses || []) : (existingData?.expenses || []), existingData?.expenses || [], existingData?.deletedItems?.expenses || []),
+        budgets: mergeColl(budgets !== undefined ? (budgets || []) : (existingData?.budgets || []), existingData?.budgets || [], existingData?.deletedItems?.budgets || []),
+        categoryBudgets: mergeColl(categoryBudgets !== undefined ? (categoryBudgets || []) : (existingData?.categoryBudgets || []), existingData?.categoryBudgets || [], existingData?.deletedItems?.categoryBudgets || []),
+        secrets: mergeColl(secrets !== undefined ? (secrets || []) : (existingData?.secrets || []), existingData?.secrets || [], existingData?.deletedItems?.secrets || []),
+        journals: mergeColl(journals !== undefined ? (journals || []) : (existingData?.journals || []), existingData?.journals || [], existingData?.deletedItems?.journals || []),
         settings: settings || {},
         translationStats: translationStats || {},
         dataModified: updateDataModified ? new Date().toISOString() : (existingData?.dataModified || new Date().toISOString())
       };
+      // ★ 修复：任务等业务编辑也要更新 settings 时间戳，否则自动同步判定"云端较新"把本地编辑覆盖回退
+      if (updateDataModified && data.settings) {
+        const nowMs = Date.now();
+        data.settings = {
+          ...(data.settings || {}),
+          dataLastModified: nowMs,
+          lastModified: nowMs
+        };
+      }
 
       if (existingData) {
         Object.keys(existingData).forEach(key => {
@@ -663,14 +744,21 @@ class DataManager {
       return { success: true, message: '保存成功' };
     } catch (e) {
       console.error('[DataManager] 写入数据失败:', e);
+      // ★ 临时诊断：写盘失败记录到诊断日志
+      try {
+        const logPath = require('path').join(require('path').dirname(await this.getDataFilePath()), 'app-cache', 'priority-debug.log');
+        require('fs').appendFileSync(logPath, `[WRITE-FAIL] ${e.message}\n`);
+      } catch (e2) {}
       return { success: false, message: '保存失败: ' + e.message };
     }
   }
 
   async updateData(type, updates) {
-    const data = await this.readData();
-    // ★ 墓碑集合初始化（保证任何删除都能被记录并跨同步传播）
-    if (!data.deletedItems) data.deletedItems = {};
+    return this._withOpLock(async () => {
+      // ★ 修复：基于队列最新状态合并，而不是磁盘旧值（防止未落盘编辑被后续读盘覆盖）
+      const data = await this._getCurrentData();
+      // ★ 墓碑集合初始化（保证任何删除都能被记录并跨同步传播）
+      if (!data.deletedItems) data.deletedItems = {};
 
     switch (type) {
       case 'task':
@@ -732,8 +820,8 @@ class DataManager {
         break;
     }
 
-    this.cachedData = { ...data };
-    this.lastDataLoadTime = Date.now();
+      this.cachedData = { ...data };
+      this.lastDataLoadTime = Date.now();
 
     const writeResult = await this.writeData(
       data.tasks,
@@ -753,7 +841,8 @@ class DataManager {
       data.deletedItems // ★ 第15参数：墓碑集合，必须显式传入，否则本地删除无法落盘、云端数据会被重新同步回来
     );
 
-    return { data: data, writeResult: writeResult };
+      return { data: data, writeResult: writeResult };
+    });
   }
 }
 

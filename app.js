@@ -39,7 +39,6 @@ class AppController {
     this.budgets = [];
     this.secrets = [];
     this.journals = [];
-    this.dailyTasks = [];
     this.editingMemoId = null;
     this.searchKeyword = '';
     this.currentYear = new Date().getFullYear();
@@ -127,7 +126,6 @@ class AppController {
 
     // ── 步骤1：加载全部数据（直读 data.json，不依赖 IPC）──
     try { await this.loadAllData(); } catch (e) { console.error('[onDOMReady] loadAllData 失败:', e); }
-    try { this.renderDailyTasksSection(); } catch (e) {}
 
     // ── 步骤1.5：初始化昔涟设置（必须在 initFromCache 之前完成，否则 window.__xilianPresets 为空导致聊天记录 key 算错）──
     try { await XilianSettings.init(); } catch (e) { console.error('[onDOMReady] XilianSettings.init 失败:', e); }
@@ -347,6 +345,12 @@ class AppController {
    * 原来的 7 次独立 IPC 调用 → 改为 1 次同步磁盘读取
    */
   async loadAllData() {
+    // ★ 临时诊断：记录数据重载来源
+    try {
+      const { ipcRenderer } = require('electron');
+      const t521 = this.tasks.find(t => String(t.id) === '521');
+      ipcRenderer.invoke('debug-priority-log', `[LOAD-ALL] called from=${new Error().stack ? String(new Error().stack).split('\n')[2] || '?' : '?'} prev521P=${t521 ? t521.priority : '?'} prev521G=${t521 ? t521.progress : '?'}`).catch(() => {});
+    } catch (e) {}
     try {
       // ★ 统一通过 IPC 加载，确保和主进程读写同一个 data.json
       // （主进程会根据 cloudCurrentUserId 决定读 users/xxx/data.json 还是 data.json）
@@ -368,7 +372,6 @@ class AppController {
       const chatHistoryStore = data.chatHistoryStore || {};
       const chatRooms = data.chatRooms || [];
       const chatHistoryLimit = data.chatHistoryLimit || 50;
-      const dailyTasks = data.dailyTasks || [];
 
       this.tasks = tasks;
       this.memos = memos;
@@ -377,7 +380,6 @@ class AppController {
       this.categoryBudgets = categoryBudgets;
       this.secrets = secrets;
       this.journals = journals;
-      this.dailyTasks = dailyTasks;
 
       this.taskManager.tasks = tasks;
       this.memoManager.memos = memos;
@@ -2002,7 +2004,6 @@ class AppController {
     this.selectedDateStr = utils.formatDateKey(newDate);
     this.updateDateDisplay();
     this.renderDailyTasks();
-    this.renderDailyTasksSection();
     this.renderDailyExpenses();
     this.renderStatistics();
   }
@@ -2252,11 +2253,15 @@ class AppController {
     // 切换 panel-header 右侧 + 按钮的可见性
     const addTaskBtn = document.getElementById('addTaskBtn');
     const addSecretBtn = document.getElementById('addSecretBtn');
+    const addReminderBtn = document.getElementById('addReminderBtn');
     if (addTaskBtn) {
       addTaskBtn.style.display = view === 'tasks' ? 'flex' : 'none';
     }
     if (addSecretBtn) {
       addSecretBtn.style.display = view === 'secrets' ? 'flex' : 'none';
+    }
+    if (addReminderBtn) {
+      addReminderBtn.style.display = view === 'reminders' ? 'flex' : 'none';
     }
 
     // 笔记 / 星图视图时隐藏日期导航（笔记自带标题栏）
@@ -5236,8 +5241,9 @@ class AppController {
     const confirmed = confirm(`确定要删除子任务「${subtaskTitle}」吗？`);
     if (!confirmed) return;
 
-    task.subtasks.splice(subtaskIndex, 1);
-    await this.saveTasksDirect(task);
+      task.subtasks.splice(subtaskIndex, 1);
+    // ★ 修复：只提交 subtasks 字段
+    await this.taskManager.updateTask(task.id, { subtasks: task.subtasks });
     this.renderDailyTasks();
   }
 
@@ -5332,13 +5338,16 @@ class AppController {
     });
 
     ipcRenderer.on('tasks-updated', async () => {
+      // ★ 临时诊断：记录渲染层任务数组引用关系和 521 状态
+      try {
+        const t521 = this.tasks.find(t => String(t.id) === '521');
+        const tm521 = this.taskManager.tasks.find(t => String(t.id) === '521');
+        ipcRenderer.invoke('debug-priority-log', `[TU-EVT] sameArr=${this.tasks === this.taskManager.tasks} thisP=${t521 ? t521.priority : '?'} thisG=${t521 ? t521.progress : '?'} tmP=${tm521 ? tm521.priority : '?'} tmG=${tm521 ? tm521.progress : '?'}`).catch(() => {});
+      } catch (e) {}
       this.tasks = this.taskManager.getTasks();
       this.renderCalendar();
-      this.renderDailyContent();
-    });
-
-    ipcRenderer.on('daily-tasks-updated', async () => {
-      await this.loadDailyTasks();
+      // ★ 优化：任务更新只刷新任务区（含侧边栏），不再连带重渲染收支/日历，减少连续编辑卡顿
+      this._scheduleTaskListRefresh();
     });
 
     ipcRenderer.on('memos-updated', async () => {
@@ -5657,6 +5666,36 @@ class AppController {
     return utils.formatDateKey(expenseDate) === dateStr;
   }
 
+  // ★ 防抖合并连续的任务刷新（连续编辑/删除子任务时避免每次全量重渲染）
+  _scheduleTaskListRefresh() {
+    if (this._taskListRefreshTimer) return;
+    const tryRender = () => {
+      this._taskListRefreshTimer = null;
+      const container = dom.get('dailyTasksContainer');
+      const menuOpen = document.querySelector('.priority-dropdown-menu');
+      // ★ 菜单打开或用户正在编辑任务文本框时挂起渲染，避免重建 DOM
+      //   销毁用户正在操作的菜单 / 打断输入（这正是"点两次才弹出菜单"和
+      //   "进度保存不上、看似回退"的根因）
+      if (menuOpen || (container && container.contains(document.activeElement))) {
+        this._taskListRefreshTimer = setTimeout(tryRender, 250);
+        return;
+      }
+      try {
+        this.renderDailyTasks();
+      } catch (e) {
+        console.error('[任务刷新] 渲染失败:', e);
+      }
+    };
+    this._taskListRefreshTimer = setTimeout(tryRender, 60);
+  }
+
+  // ★ 菜单关闭后补一次刷新（菜单打开期间挂起的渲染在关闭后执行）
+  refreshTasksAfterMenuClose() {
+    if (!document.querySelector('.priority-dropdown-menu')) {
+      this._scheduleTaskListRefresh();
+    }
+  }
+
   renderDailyContent() {
     const titleEl = dom.get('selectedDateTitle');
     const todayStr = utils.formatDateKey(new Date());
@@ -5700,15 +5739,11 @@ class AppController {
           if (subtaskItem) {
             subtaskItem.classList.toggle('completed', isChecked);
           }
-          
-          this.saveTasksDirect(task);
+          // ★ 修复：只提交 subtasks 字段
+          this.taskManager.updateTask(task.id, { subtasks: task.subtasks });
         }
       }
     });
-  }
-
-  async saveTasksDirect(task) {
-    await this.taskManager.updateTask(task.id, task);
   }
 
   async saveTasks() {
@@ -5717,170 +5752,6 @@ class AppController {
     }
   }
 
-  // ── 今日任务独立分区 ──
-  renderDailyTasksSection() {
-    const section = dom.get('dailyTasksSection');
-    const listEl = dom.get('dailyTasksContainerList');
-    const countEl = dom.get('dailyTasksCount');
-    const addRow = document.getElementById('dailyTaskAddRow');
-
-    if (!section || !listEl) return;
-
-    const today = new Date().toISOString().slice(0, 10);
-    // ★ 所有今日任务永不消失，跨天自动重置勾选
-    const tasks = [...(this.dailyTasks || [])];
-    // 跨天重置：如果 dailyDate !== today，强制 completed = false（今天是新的一天）
-    for (const t of tasks) {
-      if (t.dailyDate !== today) t.completed = false;
-    }
-    tasks.sort((a, b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
-
-    if (countEl) {
-      const remaining = tasks.filter(t => !t.completed).length;
-      countEl.textContent = remaining > 0 ? `${remaining} 项待完成` : '';
-    }
-
-    section.style.display = 'block';
-
-    listEl.innerHTML = '';
-    if (tasks.length === 0) {
-      listEl.innerHTML = '<div class="daily-tasks-empty">暂无今日任务，点击下方「+」添加</div>';
-    } else {
-      const frag = document.createDocumentFragment();
-      for (const dt of tasks) {
-        const item = document.createElement('div');
-        const isDone = dt.completed === true;
-        item.className = 'daily-task-item' + (isDone ? ' completed' : '');
-        item.dataset.id = dt.id;
-        item.innerHTML = `
-          <input type="checkbox" class="daily-task-checkbox" data-id="${dt.id}" ${isDone ? 'checked' : ''}>
-          <div class="daily-task-title" contenteditable="true" data-id="${dt.id}" data-original="${utils.escapeHtml(dt.title || '').replace(/"/g, '&quot;')}">${dt.title ? dt.title.replace(/\n/g, '<br>') : ''}</div>
-          <button class="daily-task-delete" data-id="${dt.id}" title="删除">×</button>
-        `;
-        frag.appendChild(item);
-      }
-      listEl.appendChild(frag);
-    }
-
-    // ------ 内联编辑：contenteditable div ------
-    const handleTitleEdit = (div) => {
-      const original = div.dataset.original || '';
-      const id = div.dataset.id;
-      let saved = false;
-      const save = async () => {
-        if (saved) return;
-        saved = true;
-        const text = div.innerText.trim();
-        if (text && text !== original) {
-          await ipcRenderer.invoke('daily-task-update', id, { title: text });
-        } else if (!text) {
-          // 空内容恢复原文，等 loadDailyTasks 重新渲染
-        }
-        this.loadDailyTasks();
-      };
-      const exit = () => { div.contentEditable = 'false'; save(); };
-      div.addEventListener('blur', exit);
-      div.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' && ev.shiftKey) return; // Shift+Enter → 换行
-        if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); exit(); return; }
-        if (ev.key === 'Escape') { div.contentEditable = 'false'; this.loadDailyTasks(); }
-      });
-    };
-    listEl.querySelectorAll('.daily-task-title[contenteditable]').forEach(handleTitleEdit);
-
-    // 列表事件委托
-    listEl.onclick = (e) => {
-      const checkbox = e.target.closest('.daily-task-checkbox');
-      if (checkbox) return;
-      const delBtn = e.target.closest('.daily-task-delete');
-      if (delBtn) return;
-    };
-
-    // checkbox 事件（独立于 onclick 避免冲突）
-    listEl.onchange = (e) => {
-      const checkbox = e.target.closest('.daily-task-checkbox');
-      if (checkbox) {
-        const id = checkbox.dataset.id;
-        // ★ 勾选/取消勾选时同步写入当天日期，这样第二天跨天自动重置
-        const today = new Date().toISOString().slice(0, 10);
-        ipcRenderer.invoke('daily-task-update', id, { completed: checkbox.checked, dailyDate: today }).then(() => this.loadDailyTasks());
-      }
-    };
-
-    // 删除按钮事件（独立处理）
-    listEl.addEventListener('click', (e) => {
-      const delBtn = e.target.closest('.daily-task-delete');
-      if (!delBtn) return;
-      e.stopPropagation();
-      const id = delBtn.dataset.id;
-      ipcRenderer.invoke('daily-task-delete', id).then(() => this.loadDailyTasks());
-    }, { once: false });
-
-    // + 添加今日任务 行
-    if (addRow) {
-      addRow.onclick = () => {
-        if (listEl.querySelector('.daily-task-edit-input[data-id=""]')) return; // 已有新建行
-        const empty = listEl.querySelector('.daily-tasks-empty');
-        if (empty) empty.remove();
-
-        const editRow = document.createElement('div');
-        editRow.className = 'daily-task-item';
-        editRow.innerHTML = `
-          <input type="checkbox" class="daily-task-checkbox" disabled>
-          <input type="text" class="daily-task-edit-input" placeholder="输入任务名，Enter 确认">
-          <button class="daily-task-delete" title="取消">×</button>
-        `;
-        listEl.appendChild(editRow);
-        const input = editRow.querySelector('.daily-task-edit-input');
-        input.focus();
-
-        let _confirming = false; // ★ 防双击创建
-        const cancel = () => {
-          if (_confirming) return;
-          editRow.remove();
-          if (!listEl.children.length) this.renderDailyTasksSection();
-        };
-        const confirm = async () => {
-          if (_confirming) return;
-          _confirming = true;
-          const title = input.value.trim();
-          if (!title) { cancel(); return; }
-          try {
-            const task = { title, completed: false, dailyDate: new Date().toISOString().slice(0, 10) };
-            const r = await ipcRenderer.invoke('daily-task-create', task);
-            if (r && r.success) {
-              const list = await ipcRenderer.invoke('daily-tasks-get');
-              this.dailyTasks = list || [];
-              this.renderDailyTasksSection();
-            }
-          } catch (e) {
-            console.error('[每日任务] confirm error:', e);
-            _confirming = false;
-          }
-        };
-
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') { e.preventDefault(); confirm(); }
-          if (e.key === 'Escape') cancel();
-        });
-        input.addEventListener('blur', () => { if (input.value.trim()) confirm(); else cancel(); });
-        editRow.querySelector('.daily-task-delete').onclick = cancel;
-      };
-    }
-
-    // ★ 同步刷新左侧导航栏
-    this.renderTaskSidebar();
-  }
-
-  async loadDailyTasks() {
-    try {
-      const tasks = await ipcRenderer.invoke('daily-tasks-get');
-      this.dailyTasks = tasks || [];
-      this.renderDailyTasksSection();
-    } catch (e) {
-      console.error('加载每日任务失败:', e);
-    }
-  }
 
   renderDailyTasks() {
     const tasksContainer = dom.get('dailyTasksContainer');
@@ -6105,11 +5976,10 @@ class AppController {
     this.renderTaskSidebar();
   }
 
-  // ★ 任务左侧导航栏渲染：每日任务 + 主任务快速跳转
+  // ★ 任务左侧导航栏渲染：主任务快速跳转
   renderTaskSidebar() {
-    const dailyList = dom.get('taskSidebarDailyList');
     const mainList = dom.get('taskSidebarMainList');
-    if (!dailyList || !mainList) return;
+    if (!mainList) return;
 
     // ★ 首次渲染时绑定折叠/展开 + 滚动同步（只绑一次）
     if (!this._taskSidebarEventsBound) {
@@ -6129,30 +5999,6 @@ class AppController {
         if (localStorage.getItem('taskSidebarCollapsed') === '1') applySidebarCollapsed(true);
       } catch (e) {}
       this.setupTaskSidebarScrollSync();
-    }
-
-    // ── 每日任务分组 ──
-    const today = new Date().toISOString().slice(0, 10);
-    const dailyTasks = [...(this.dailyTasks || [])]
-      .map(t => ({ ...t, completed: t.dailyDate !== today ? false : t.completed === true }))
-      .sort((a, b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
-    const dailyCountEl = dom.get('taskSidebarDailyCount');
-    if (dailyCountEl) {
-      const remaining = dailyTasks.filter(t => !t.completed).length;
-      dailyCountEl.textContent = remaining > 0 ? `${remaining}` : '';
-    }
-    dailyList.innerHTML = '';
-    if (dailyTasks.length === 0) {
-      dailyList.innerHTML = '<div class="task-sidebar-empty">暂无今日任务</div>';
-    } else {
-      for (const dt of dailyTasks) {
-        const item = document.createElement('div');
-        item.className = 'task-sidebar-item' + (dt.completed ? ' is-done' : '');
-        item.setAttribute('data-sidebar-daily-id', dt.id);
-        item.innerHTML = `<span class="task-sidebar-text">${utils.escapeHtml(dt.title || '未命名任务')}</span>`;
-        item.addEventListener('click', () => this.jumpToTaskSidebar('daily', dt.id));
-        dailyList.appendChild(item);
-      }
     }
 
     // ── 主任务分组（按当前选中日期） ──
@@ -6195,15 +6041,7 @@ class AppController {
 
   // ★ 点击侧边栏任务 → 跳转到对应任务并高亮
   jumpToTaskSidebar(type, id) {
-    let target = null;
-    if (type === 'daily') {
-      // 确保每日任务区块可见
-      const section = dom.get('dailyTasksSection');
-      if (section) section.style.display = 'block';
-      target = document.querySelector(`.daily-task-item[data-id="${id}"]`);
-    } else {
-      target = document.querySelector(`.task-group[data-id="${id}"]`);
-    }
+    const target = document.querySelector(`.task-group[data-id="${id}"]`);
 
     if (target) {
       // ★ 关键修复：scrollIntoView 会冒泡触发 body 滚动导致跨视图内容露出
@@ -6213,7 +6051,7 @@ class AppController {
         const targetTop = target.offsetTop - 16; // 留 16px 顶部余白
         scrollArea.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
       } else {
-        target.scrollIntoView({ behavior: 'smooth', block: type === 'daily' ? 'center' : 'start' });
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       target.classList.remove('task-sidebar-highlight');
       void target.offsetWidth; // 重启动画
@@ -6228,15 +6066,9 @@ class AppController {
   setTaskSidebarActive(type, id) {
     const sidebar = dom.get('taskSidebar');
     if (!sidebar) return;
-    if (type === 'daily') {
-      sidebar.querySelectorAll('.task-sidebar-item[data-sidebar-daily-id]').forEach(el => {
-        el.classList.toggle('active', el.getAttribute('data-sidebar-daily-id') === id);
-      });
-    } else {
-      sidebar.querySelectorAll('.task-sidebar-item[data-sidebar-main-id]').forEach(el => {
-        el.classList.toggle('active', el.getAttribute('data-sidebar-main-id') === id);
-      });
-    }
+    sidebar.querySelectorAll('.task-sidebar-item[data-sidebar-main-id]').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-sidebar-main-id') === id);
+    });
   }
 
   // ★ 滚动右侧内容区时同步侧边栏 active（当前可见的任务）
@@ -6252,25 +6084,16 @@ class AppController {
         ticking = false;
         try {
           const groups = [...scrollArea.querySelectorAll('.task-group')];
-          const dailies = [...scrollArea.querySelectorAll('.daily-task-item')];
-          if (!groups.length && !dailies.length) return;
+          if (!groups.length) return;
           const mark = scrollArea.getBoundingClientRect().top + 60; // 视口顶部偏下一点
-          let curMain = null, curDaily = null;
+          let curMain = null;
           for (const g of groups) {
             if (g.getBoundingClientRect().top <= mark) curMain = g.getAttribute('data-id');
-            else break;
-          }
-          for (const d of dailies) {
-            if (d.getBoundingClientRect().top <= mark) curDaily = d.getAttribute('data-id');
             else break;
           }
           if (curMain !== null && curMain !== this._sidebarActiveMain) {
             this._sidebarActiveMain = curMain;
             this.setTaskSidebarActive('main', curMain);
-          }
-          if (curDaily !== null && curDaily !== this._sidebarActiveDaily) {
-            this._sidebarActiveDaily = curDaily;
-            this.setTaskSidebarActive('daily', curDaily);
           }
         } catch (e) {}
       });
@@ -6413,27 +6236,35 @@ class AppController {
         if (subtaskIndex !== undefined) {
           const task = this.tasks.find(t => String(t.id) === String(taskId));
           if (task && task.subtasks && task.subtasks[subtaskIndex]) {
-            task.subtasks[subtaskIndex].title = newValue;
-            await this.saveTasksDirect(task);
-            this.renderDailyTasks();
+            const currentTitle = task.subtasks[subtaskIndex].title || '';
+            if (newValue !== currentTitle) {
+              task.subtasks[subtaskIndex].title = newValue;
+              // ★ 修复：只提交 subtasks 字段，避免整对象带过期值覆盖其他字段
+              await this.taskManager.updateTask(task.id, { subtasks: task.subtasks });
+            }
           }
         } else {
           const task = this.tasks.find(t => String(t.id) === String(taskId));
           if (task) {
-            if (field === 'task-title') {
+            const patch = {};
+            if (field === 'task-title' && newValue !== (task.title || '')) {
               task.title = newValue;
-            } else if (field === 'task-description') {
+              patch.title = newValue;
+            } else if (field === 'task-description' && newValue !== (task.description || '')) {
               task.description = newValue;
+              patch.description = newValue;
             }
-            await this.saveTasksDirect(task);
-            this.renderDailyTasks();
+            if (Object.keys(patch).length > 0) {
+              // ★ 修复：只提交改动的字段，避免整对象带过期值覆盖其他字段
+              await this.taskManager.updateTask(task.id, patch);
+            }
           }
         }
       });
     });
 
     document.querySelectorAll('.task-date-input').forEach(input => {
-      input.addEventListener('change', this.dateInputChangeHandler = (e) => {
+      input.addEventListener('change', this.dateInputChangeHandler = async (e) => {
         const field = e.target.dataset.field;
         const taskId = e.target.dataset.id || e.target.dataset.taskId;
         const subtaskIndex = e.target.dataset.subtaskIndex;
@@ -6441,15 +6272,21 @@ class AppController {
         
         const task = this.tasks.find(t => String(t.id) === String(taskId));
         if (task) {
+          const patch = {};
           if (subtaskIndex !== undefined && task.subtasks && task.subtasks[subtaskIndex]) {
             if (field === 'subtask-dueDate') {
               task.subtasks[subtaskIndex].dueDate = newValue || undefined;
+              patch.subtasks = task.subtasks;
             }
           } else {
             task[field] = newValue || undefined;
+            patch[field] = newValue || undefined;
           }
-          this.saveTasksDirect(task);
-          this.renderDailyTasks();
+          if (Object.keys(patch).length > 0) {
+            // ★ 修复：只提交改动的字段
+            await this.taskManager.updateTask(task.id, patch);
+            this.renderDailyTasks();
+          }
         }
       });
     });
@@ -6471,7 +6308,8 @@ class AppController {
             progress: 'pending'
           };
           task.subtasks.push(newSubtask);
-          await this.saveTasksDirect(task);
+          // ★ 修复：只提交 subtasks 字段
+          await this.taskManager.updateTask(task.id, { subtasks: task.subtasks });
           this.renderDailyTasks();
         }
       });
@@ -6498,123 +6336,147 @@ class AppController {
       document.removeEventListener('click', this.priorityClickHandler);
     }
 
-    document.querySelectorAll('.priority-btn').forEach(btn => {
-      btn.removeEventListener('click', this.priorityBtnClickHandler);
-      btn.addEventListener('click', this.priorityBtnClickHandler = (e) => {
+    // ★ 修复：改用 document 级事件委托，避免每次渲染给每个按钮重复绑定点击处理器
+    //   （旧实现每次 renderDailyTasks 都会多绑一层，导致"点两次才弹出菜单"）
+    this.priorityClickHandler = (e) => {
+      const btn = e.target.closest('.priority-btn');
+      if (btn) {
         e.stopPropagation();
-        const currentBtn = e.currentTarget;
-        
-        const existingMenu = document.querySelector('.priority-dropdown-menu.show');
-        if (existingMenu) {
-          existingMenu.remove();
-          return;
-        }
-        
-        document.querySelectorAll('.priority-dropdown-menu').forEach(m => {
-          if (!m.classList.contains('show')) {
-            m.remove();
-          }
-        });
-        
-        const menu = document.createElement('div');
-        menu.className = 'priority-dropdown-menu';
-        menu.innerHTML = `
-          <button class="priority-option priority-urgent" data-value="urgent">紧急</button>
-          <button class="priority-option priority-high" data-value="priority">优先</button>
-          <button class="priority-option priority-medium" data-value="normal">普通</button>
-          <button class="priority-option priority-low" data-value="secondary">次要</button>
-        `;
-        
-        const type = currentBtn.dataset.type;
-        if (type === 'progress' || type === 'subtask-progress') {
-          menu.innerHTML = `
-            <button class="priority-option progress-pending" data-value="pending">待开始</button>
-            <button class="priority-option progress-in-progress" data-value="in-progress">进行中</button>
-            <button class="priority-option progress-stalled" data-value="stalled">已停滞</button>
-            <button class="priority-option progress-completed" data-value="completed">已完成</button>
-          `;
-        }
-        
-        document.body.appendChild(menu);
-        
-        const btnRect = currentBtn.getBoundingClientRect();
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        
-        menu.style.position = 'fixed';
-        menu.style.display = 'flex';
-        
-        const menuWidth = menu.offsetWidth;
-        const menuHeight = menu.offsetHeight;
-        
-        let left = btnRect.right - menuWidth;
-        let top = btnRect.bottom + 4;
-        
-        if (left + menuWidth > windowWidth) {
-          left = btnRect.left;
-        }
-        if (left < 0) left = 0;
-        if (top + menuHeight > windowHeight) {
-          top = btnRect.top - menuHeight - 4;
-        }
-        if (top < 0) top = btnRect.bottom + 4;
-        
-        menu.style.left = `${left}px`;
-        menu.style.top = `${top}px`;
-        
-        menu.classList.add('show');
-        
-        const handleOptionClick = (e) => {
-          e.stopPropagation();
-          const value = e.target.dataset.value;
-          const taskId = currentBtn.dataset.taskId || currentBtn.dataset.id;
-          const subtaskIndex = currentBtn.dataset.subtaskIndex;
-          
-          const task = this.tasks.find(t => String(t.id) === String(taskId));
-          if (task) {
-            if (type === 'subtask' && subtaskIndex !== undefined && task.subtasks && task.subtasks[subtaskIndex]) {
-              task.subtasks[subtaskIndex].priority = value;
-            } else if (type === 'subtask-progress' && subtaskIndex !== undefined && task.subtasks && task.subtasks[subtaskIndex]) {
-              task.subtasks[subtaskIndex].progress = value;
-            } else if (type === 'progress') {
-              task.progress = value;
-              if (value === 'completed' && task.subtasks) {
-                task.subtasks.forEach(subtask => {
-                  subtask.progress = 'completed';
-                });
-              }
-            } else {
-              task.priority = value;
-            }
-            this.saveTasksDirect(task);
-            this.renderDailyTasks();
-          }
-          
-          menu.remove();
-          document.removeEventListener('click', handleDocumentClick);
-        };
-        
-        const handleDocumentClick = (e) => {
-          if (!menu.contains(e.target) && !currentBtn.contains(e.target)) {
-            menu.remove();
-            document.removeEventListener('click', handleDocumentClick);
-          }
-        };
-        
-        menu.querySelectorAll('.priority-option').forEach(option => {
-          option.addEventListener('click', handleOptionClick);
-        });
-        
-        setTimeout(() => {
-          document.addEventListener('click', handleDocumentClick);
-        }, 0);
+        this.togglePriorityDropdown(btn);
+      } else if (!e.target.closest('.priority-dropdown-menu')) {
+        // 点击菜单外部 → 关闭所有菜单，并补一次刷新（菜单挂起期间的渲染延迟执行）
+        const hadMenu = document.querySelector('.priority-dropdown-menu');
+        document.querySelectorAll('.priority-dropdown-menu').forEach(m => m.remove());
+        if (hadMenu) this.refreshTasksAfterMenuClose();
+      }
+    };
+    document.addEventListener('click', this.priorityClickHandler);
+  }
+
+  togglePriorityDropdown(currentBtn) {
+    const existingMenu = document.querySelector('.priority-dropdown-menu.show');
+    if (existingMenu) {
+      existingMenu.remove();
+      this.refreshTasksAfterMenuClose();
+      return;
+    }
+
+    document.querySelectorAll('.priority-dropdown-menu').forEach(m => m.remove());
+
+    const menu = document.createElement('div');
+    menu.className = 'priority-dropdown-menu';
+    const type = currentBtn.dataset.type;
+    if (type === 'progress' || type === 'subtask-progress') {
+      menu.innerHTML = `
+        <button class="priority-option progress-pending" data-value="pending">待开始</button>
+        <button class="priority-option progress-in-progress" data-value="in-progress">进行中</button>
+        <button class="priority-option progress-stalled" data-value="stalled">已停滞</button>
+        <button class="priority-option progress-completed" data-value="completed">已完成</button>
+      `;
+    } else {
+      menu.innerHTML = `
+        <button class="priority-option priority-urgent" data-value="urgent">紧急</button>
+        <button class="priority-option priority-high" data-value="priority">优先</button>
+        <button class="priority-option priority-medium" data-value="normal">普通</button>
+        <button class="priority-option priority-low" data-value="secondary">次要</button>
+      `;
+    }
+
+    document.body.appendChild(menu);
+
+    const btnRect = currentBtn.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+
+    menu.style.position = 'fixed';
+    menu.style.display = 'flex';
+
+    const menuWidth = menu.offsetWidth;
+    const menuHeight = menu.offsetHeight;
+
+    let left = btnRect.right - menuWidth;
+    let top = btnRect.bottom + 4;
+
+    if (left + menuWidth > windowWidth) {
+      left = btnRect.left;
+    }
+    if (left < 0) left = 0;
+    if (top + menuHeight > windowHeight) {
+      top = btnRect.top - menuHeight - 4;
+    }
+    if (top < 0) top = btnRect.bottom + 4;
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+
+    menu.classList.add('show');
+
+    // 选项点击：菜单是新建 DOM，不会重复绑定
+    menu.querySelectorAll('.priority-option').forEach(option => {
+      option.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.applyPriorityOption(currentBtn, type, option.dataset.value);
+        menu.remove();
       });
     });
+  }
 
+  applyPriorityOption(currentBtn, type, value) {
+    const taskId = currentBtn.dataset.taskId || currentBtn.dataset.id;
+    const subtaskIndex = currentBtn.dataset.subtaskIndex;
 
+    const task = this.tasks.find(t => String(t.id) === String(taskId));
+    if (!task) return;
 
-    
+    // ★ 临时诊断：记录操作前状态
+    try {
+      const beforeInfo = { p: task.priority, g: task.progress, sp: subtaskIndex !== undefined && task.subtasks ? task.subtasks[subtaskIndex]?.priority : undefined, sg: subtaskIndex !== undefined && task.subtasks ? task.subtasks[subtaskIndex]?.progress : undefined };
+      ipcRenderer.invoke('debug-priority-log', `[UI-OPT] id=${taskId} type=${type} value=${value} sameArr=${this.tasks === this.taskManager.tasks} before=${JSON.stringify(beforeInfo)}`).catch(() => {});
+    } catch (e) {}
 
+    let changed = false;
+    if (type === 'subtask' && subtaskIndex !== undefined && task.subtasks && task.subtasks[subtaskIndex]) {
+      if (task.subtasks[subtaskIndex].priority !== value) {
+        task.subtasks[subtaskIndex].priority = value;
+        this.taskManager.updateTask(task.id, { subtasks: task.subtasks });
+        changed = true;
+      }
+    } else if (type === 'subtask-progress' && subtaskIndex !== undefined && task.subtasks && task.subtasks[subtaskIndex]) {
+      if (task.subtasks[subtaskIndex].progress !== value) {
+        task.subtasks[subtaskIndex].progress = value;
+        this.taskManager.updateTask(task.id, { subtasks: task.subtasks });
+        changed = true;
+      }
+    } else if (type === 'progress') {
+      if (task.progress !== value) {
+        task.progress = value;
+        if (value === 'completed' && task.subtasks) {
+          task.subtasks.forEach(subtask => {
+            subtask.progress = 'completed';
+          });
+        }
+        this.taskManager.updateTask(task.id, { progress: value });
+        changed = true;
+      }
+    } else {
+      if (task.priority !== value) {
+        task.priority = value;
+        // ★ 只提交优先级字段，主进程以自身数据为准合并，避免整对象带过期值覆盖
+        this.taskManager.updateTask(task.id, { priority: value });
+        changed = true;
+      }
+    }
+    if (changed) {
+      // ★ 优化：局部更新按钮显示，避免每次切换都全量重建任务列表（防抖排序由 tasks-updated 合并处理）
+      if (type === 'progress' || type === 'subtask-progress') {
+        currentBtn.textContent = this.getProgressLabel(value);
+        currentBtn.className = `priority-btn ${this.getProgressClass(value)}`;
+      } else {
+        currentBtn.textContent = this.getPriorityLabel(value);
+        currentBtn.className = `priority-btn ${this.getPriorityClass(value)}`;
+      }
+      this._scheduleTaskListRefresh();
+    }
   }
 
   renderDailyExpenses() {
@@ -8714,23 +8576,37 @@ class AppController {
 
     let saveSuccess = true;
     if (this.currentEditingType === 'task' && this.currentEditingItem) {
+      // ★ 修复：编辑时只提交有差异的字段，避免表单里未改动的旧值（优先级/进度等）
+      //   覆盖主界面上已经更新过的数据
       const existingTask = this.tasks.find(t => String(t.id) === String(this.currentEditingItem));
+      const patch = {};
       if (existingTask) {
-        const fullTaskData = {
-          ...existingTask,
-          ...taskData
-        };
-        const result = await this.taskManager.updateTask(this.currentEditingItem, fullTaskData);
-        saveSuccess = result.success;
-        if (!saveSuccess) {
-          alert('保存任务失败: ' + result.message);
-        }
+        if (title !== (existingTask.title || '')) patch.title = title;
+        if (description !== (existingTask.description || '')) patch.description = description;
+        if (priority !== (existingTask.priority || 'normal')) patch.priority = priority;
+        if (progress !== (existingTask.progress || 'pending')) patch.progress = progress;
+        if (startDate !== (existingTask.startDate || '')) patch.startDate = startDate;
+        if (endDate !== (existingTask.endDate || '')) patch.endDate = endDate;
+        const oldTags = JSON.stringify(existingTask.tags || []);
+        const newTags = JSON.stringify(this.taskTags || []);
+        if (oldTags !== newTags) patch.tags = this.taskTags;
+        const oldSubtasks = JSON.stringify(existingTask.subtasks || []);
+        const newSubtasks = JSON.stringify(validSubtasks);
+        if (oldSubtasks !== newSubtasks) patch.subtasks = validSubtasks;
+        if (progress === 'completed' && existingTask.completed !== true) patch.completed = true;
+        if (progress !== 'completed' && existingTask.completed === true) patch.completed = false;
       } else {
-        const result = await this.taskManager.updateTask(this.currentEditingItem, taskData);
-        saveSuccess = result.success;
-        if (!saveSuccess) {
-          alert('保存任务失败: ' + result.message);
-        }
+        Object.assign(patch, taskData);
+      }
+      if (Object.keys(patch).length === 0) {
+        this.closeTaskModal();
+        this.notifyDataChange();
+        return;
+      }
+      const result = await this.taskManager.updateTask(this.currentEditingItem, patch);
+      saveSuccess = result.success;
+      if (!saveSuccess) {
+        alert('保存任务失败: ' + result.message);
       }
     } else {
       const result = await this.taskManager.addTask(taskData);

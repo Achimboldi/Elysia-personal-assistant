@@ -298,10 +298,10 @@ class XilianManager {
 
         // 数据更新监听
         ipcRenderer.on('tasks-updated', () => {
-            // 聊天视图激活时才刷新，避免不必要的操作
-            if (this.isViewActive()) {
-                this.app.loadAllData?.();
-            }
+            // ★ 修复：不再在任务保存后全量 loadAllData。
+            // 聊天常驻后 isViewActive() 恒为 true，每次任务保存都会触发全量重载，
+            // 且 loadAllData 读取磁盘时保存可能尚未落盘，会把用户刚改的优先级/进度回退。
+            // 聊天数据在任务保存时并未变化，无需重载。
         });
 
         // ★ 云端下载/提醒触发后刷新聊天记录：确保其他设备或提醒落库的消息能立即显示
@@ -549,7 +549,6 @@ class XilianManager {
         this._setStreaming(false);
         XilianUI.setInputEnabled(true);
         XilianUI.showToolStatus(false, '');
-        XilianUI.hideToolCards();
 
         // ★ 隐藏内嵌工具进度面板
         if (this.currentAssistantMsg) {
@@ -790,11 +789,6 @@ class XilianManager {
                     arguments: chunk.data.arguments
                 };
                 XilianUI.showToolStatus(true, `正在执行: ${this.getToolLabel(chunk.data.toolName)}...`);
-                XilianUI.appendToolCard({
-                    name: chunk.data.toolName,
-                    status: 'running',
-                    args: chunk.data.arguments
-                });
                 // ★ 内嵌进度面板：在助手消息气泡内显示工具调用
                 if (this.currentAssistantMsg) {
                     XilianUI.showToolProgress(
@@ -823,14 +817,6 @@ class XilianManager {
                 const success = result?.success !== false;
                 XilianUI.showToolStatus(true,
                     `${success ? '✅' : '❌'} ${this.getToolLabel(chunk.data.toolName)}: ${result?.message || ''}`);
-
-                // 更新工具卡片状态
-                XilianUI.updateLastToolCard({
-                    name: chunk.data.toolName,
-                    status: success ? 'done' : 'error',
-                    message: result?.message || '',
-                    args: chunk.data.arguments
-                });
 
                 // ★ 内嵌进度面板：更新为完成/失败状态
                 if (this.currentAssistantMsg) {
@@ -868,7 +854,6 @@ class XilianManager {
         if (!this.isStreaming && this.currentAssistantMsg === null) return;
 
         this._setStreaming(false);
-        XilianUI.hideToolCards();
 
         // 隐藏工具状态（延迟一下让用户看到最后状态）
         setTimeout(() => XilianUI.showToolStatus(false, ''), 1500);

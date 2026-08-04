@@ -82,7 +82,7 @@ function _mergeMessagesById(messagesA, messagesB) {
 // ★ 读写竞态修复：将"同步期间（网络往返）新保存的本地项"补回到合并结果
 // 自动同步基于同步开始时的旧快照做合并，直接 writeData 会覆盖掉同步窗口内用户新保存的
 // 编辑/消息。此函数重新读取最新磁盘数据，把本地新增/更新的项保留下来，避免内容丢失。
-function _reconcileWithFreshLocal(merged, fresh) {
+function _reconcileWithFreshLocal(merged, fresh, protectAfter) {
   if (!merged) return merged;
   fresh = fresh || {};
   const preserveArr = (mergedArr, freshArr, timeKeys) => {
@@ -99,7 +99,11 @@ function _reconcileWithFreshLocal(merged, fresh) {
       } else {
         const tM = _itemTime(ex, timeKeys);
         const tF = _itemTime(it, timeKeys);
-        if (tF > tM) map.set(k, it); // 本地更新时间更新 → 以本地为准
+        // ★ 修复：同步窗口内（protectAfter 之后）本地产生的新编辑，无条件以本地为准，
+        //   防止云端/手机端时间戳偏差把用户刚改的优先级、内容等回退掉
+        if (tF >= tM || (protectAfter && tF >= protectAfter && tF > 0)) {
+          map.set(k, it);
+        }
       }
     }
     return Array.from(map.values());
@@ -760,7 +764,15 @@ function setupIpcHandlers() {
 
   // ★ 统一数据加载 — 一次读盘返回全部数据，避免启动时多次 IPC 读同一个文件
   ipcMain.handle('load-all-data', async () => {
-    const data = await dataManager.readData(true);  // force fresh read
+    // ★ 修复：改用"队列最新状态"（优先返回写队列中尚未落盘的编辑），
+    //   避免 loadAllData 读到磁盘旧值，把用户刚保存的优先级/进度回退掉
+    const data = await dataManager._getCurrentData();
+    // ★ 临时诊断：记录 load-all-data 返回时 521 的状态
+    try {
+      const t521 = (data.tasks || []).find(t => String(t.id) === '521');
+      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
+      fs.appendFileSync(logPath, `[LOAD-ALL-MAIN] 521P=${t521 ? t521.priority : '?'} 521G=${t521 ? t521.progress : '?'}\n`);
+    } catch (e) {}
     // ★ 预热 data-service 同步缓存，避免后续 readData() 重复读盘
     readData();
     return {
@@ -804,12 +816,35 @@ function setupIpcHandlers() {
   
   ipcMain.handle('update-task', async (event, taskId, updates) => {
     const taskData = { ...updates, id: taskId };
+    // ★ 临时调试4：主进程收到的补丁 + 合并前优先级
+    try {
+      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
+      const dm = require('./data-manager');
+      const cur = await dm.dataManager.readData();
+      const t = (cur.tasks || []).find(x => String(x.id) === String(taskId));
+      fs.appendFileSync(logPath, `[M4] id=${taskId} keys=${Object.keys(updates || {}).join(',')} incomingPrio=${updates && updates.priority} diskPrio=${t ? t.priority : '?'}\n`);
+    } catch (e) {}
     const result = await updateData('task', taskData);
+    // ★ 临时诊断：记录主进程处理结果
+    try {
+      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
+      fs.appendFileSync(logPath, `[MAIN-RES] id=${taskId} keys=${Object.keys(updates || {}).join(',')} writeSuccess=${result && result.writeResult && result.writeResult.success} msg=${result && result.writeResult ? result.writeResult.message : '?'}\n`);
+    } catch (e) {}
     if (result.writeResult.success) {
       sendToAllWindows('tasks-updated');
     }
     return { success: result.writeResult.success, task: taskData, message: result.writeResult.message };
   });
+
+  // ★ 临时调试4：渲染端日志
+  ipcMain.handle('debug-priority-log', async (event, line) => {
+    try {
+      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
+      fs.appendFileSync(logPath, `${line}\n`);
+    } catch (e) {}
+    return { success: true };
+  });
+
 
   ipcMain.handle('toggle-task-completed', async (event, taskId) => {
     const data = await dataManager.readData();
@@ -915,94 +950,6 @@ function setupIpcHandlers() {
     }
   });
 
-  // ── 每日任务 CRUD（直接读写 data.json，避免 writeData 丢弃 dailyTasks）──
-  async function _readDailyTasks() {
-    const data = readData();
-    return data.dailyTasks || [];
-  }
-  async function _writeDailyTasks(dailyTasks) {
-    const dataPath = getDataFilePath();
-    // 等待写入锁释放（最多等 2 秒）
-    const maxWait = 2000;
-    const startWait = Date.now();
-    while (global._elysiaWriteLock && (Date.now() - startWait) < maxWait) {
-      await new Promise(r => setTimeout(r, 50));
-    }
-    if (global._elysiaWriteLock) {
-      console.error('[MC-daily] _writeDailyTasks 写入超时，锁未释放');
-      return false;
-    }
-    global._elysiaWriteLock = true;
-    try {
-      const exists = fs.existsSync(dataPath);
-      const raw = exists ? JSON.parse(fs.readFileSync(dataPath, 'utf8')) : {};
-      raw.dailyTasks = dailyTasks;
-      raw.dataModified = new Date().toISOString();
-      fs.writeFileSync(dataPath, JSON.stringify(raw, null, 2), 'utf8');
-      invalidateCache();
-      return true;
-    } catch (e) {
-      console.error('[MC-daily] _writeDailyTasks 失败:', e.message);
-      return false;
-    } finally {
-      global._elysiaWriteLock = false;
-    }
-  }
-
-  ipcMain.handle('daily-tasks-get', async () => {
-    try {
-      return await _readDailyTasks();
-    } catch (e) {
-      console.error('[MC-daily] get failed:', e.message);
-      return [];
-    }
-  });
-
-  ipcMain.handle('daily-task-create', async (event, dailyTask) => {
-    try {
-      const list = await _readDailyTasks();
-      const now = new Date().toISOString();
-      dailyTask.id = dailyTask.id || uuidv4();
-      dailyTask.createdAt = dailyTask.createdAt || now;
-      dailyTask.completed = dailyTask.completed || false;
-      dailyTask.dailyDate = dailyTask.dailyDate || now.slice(0, 10);
-      list.push(dailyTask);
-      const ok = await _writeDailyTasks(list);
-      console.log('[MC-daily] create:', dailyTask.title, 'ok=', ok);
-      return { success: ok, dailyTask };
-    } catch (e) {
-      console.error('[MC-daily] create failed:', e.message);
-      return { success: false, message: e.message };
-    }
-  });
-
-  ipcMain.handle('daily-task-update', async (event, taskId, updates) => {
-    try {
-      const list = await _readDailyTasks();
-      const idx = list.findIndex(dt => String(dt.id) === String(taskId));
-      if (idx === -1) return { success: false, message: 'task not found' };
-      Object.assign(list[idx], updates, { updatedAt: new Date().toISOString() });
-      const ok = await _writeDailyTasks(list);
-      return { success: ok, dailyTask: list[idx] };
-    } catch (e) {
-      console.error('[MC-daily] update failed:', e.message);
-      return { success: false, message: e.message };
-    }
-  });
-
-  ipcMain.handle('daily-task-delete', async (event, taskId) => {
-    try {
-      const list = await _readDailyTasks();
-      const filtered = list.filter(dt => String(dt.id) !== String(taskId));
-      if (filtered.length === list.length) return { success: false, message: 'task not found' };
-      const ok = await _writeDailyTasks(filtered);
-      return { success: ok };
-    } catch (e) {
-      console.error('[MC-daily] delete failed:', e.message);
-      return { success: false, message: e.message };
-    }
-  });
-  
   ipcMain.handle('get-memos', async () => {
     const data = await dataManager.readData();
     return data.memos;
@@ -2505,6 +2452,7 @@ function setupIpcHandlers() {
           aiUserAvatar: cloudData.settings?.aiUserAvatar || localData.settings?.aiUserAvatar || '',
           aiAgentAvatar: cloudData.settings?.aiAgentAvatar || localData.settings?.aiAgentAvatar || '',
           aiPresets: mergePresetLists(cloudData.settings?.aiPresets || [], localData.settings?.aiPresets || []),
+          reminders: mergeReminderLists(cloudData.settings?.reminders || [], localData.settings?.reminders || []),
           aiCurrentPresetId: localData.settings?.aiCurrentPresetId || cloudData.settings?.aiCurrentPresetId || '',
           autoSyncEnabled: localData.settings?.autoSyncEnabled || false,
           autoSyncInterval: localData.settings?.autoSyncInterval || 10,
@@ -2820,6 +2768,16 @@ function setupIpcHandlers() {
   });
 
   async function performAutoSync() {
+    // ★ 修复：同步前先把 dataManager 待写入队列冲刷落盘，确保下面的强制读盘包含用户最新编辑
+    try {
+      const { dataManager } = require('./data-manager');
+      if (dataManager && typeof dataManager.flushWriteQueue === 'function') {
+        await dataManager.flushWriteQueue();
+      }
+    } catch (e) {}
+    // ★ 修复：记录同步起始时刻，同步窗口内本地产生的新编辑在调和时无条件保留
+    const syncStartTime = Date.now();
+
     // ★ 强制从磁盘重读，确保包含最新的聊天记录和其他数据
     const localData = readData(true);
     const localTimestamp = localData.settings?.dataLastModified || localData.settings?.lastModified;
@@ -2871,7 +2829,7 @@ function setupIpcHandlers() {
       // ★ 修复读写竞态：重新读取最新磁盘数据，把同步期间（网络往返）用户新保存的
       // 编辑/消息补回到合并结果，避免 writeData 用陈旧快照覆盖掉这些内容
       const freshLocal = readData(true);
-      conflictResult.data = _reconcileWithFreshLocal(conflictResult.data, freshLocal);
+      conflictResult.data = _reconcileWithFreshLocal(conflictResult.data, freshLocal, syncStartTime);
 
       const newSettings = conflictResult.data.settings || {};
       newSettings.dataLastModified = Date.now();
@@ -3300,8 +3258,13 @@ function setupIpcHandlers() {
         const localItem = localMap.get(id);
         const localTime = _getItemLastModifiedTime(localItem);
         const cloudTime = _getItemLastModifiedTime(cloudItem);
+        // ★ 修复：最近 5 分钟内本地编辑过的条目，无条件以本地为准，
+        //   防止手机端/云端时间戳偏差把用户刚改的优先级、进度等回退掉
+        const localEditedRecently = localTime > 0 && (Date.now() - localTime) < 5 * 60 * 1000;
+        // 云端必须比本地明显更新（>2 分钟）才允许覆盖，吸收双端时钟偏差
+        const cloudClearlyNewer = cloudTime > localTime + 2 * 60 * 1000;
         
-        if (cloudTime > localTime) {
+        if (!localEditedRecently && cloudClearlyNewer) {
           merged.push(cloudItem);
           processedContentHashes.add(contentHash);
           safeLog(`[合并][${type}] ID ${id}: 云端更新较新`);
@@ -3428,6 +3391,26 @@ function setupIpcHandlers() {
     return merged;
   }
   
+  // ★ 提醒合并：按 id 去重，updatedAt 较新者胜；双方独有都保留（与 aiPresets 同策略）
+  // 防止云端旧 settings.reminders 覆盖本地新建的提醒导致丢失
+  function mergeReminderLists(cloudReminders, localReminders) {
+    const toList = (arr) => Array.isArray(arr) ? arr : [];
+    const map = new Map();
+    for (const r of toList(localReminders)) {
+      if (r && r.id) map.set(String(r.id), r);
+    }
+    for (const r of toList(cloudReminders)) {
+      if (!r || !r.id) continue;
+      const id = String(r.id);
+      const local = map.get(id);
+      if (!local) { map.set(id, r); continue; }
+      const lt = new Date(local.updatedAt || local.createdAt || 0).getTime();
+      const ct = new Date(r.updatedAt || r.createdAt || 0).getTime();
+      if (!isNaN(lt) && !isNaN(ct) && ct >= lt) map.set(id, r);
+    }
+    return [...map.values()];
+  }
+
   function mergeSettings(localSettings, cloudSettings) {
     return {
       ...cloudSettings,
@@ -3448,6 +3431,7 @@ function setupIpcHandlers() {
       cloudCurrentUserId: localSettings.cloudCurrentUserId || 'admin',
       // 智能体数据：本地优先，防止云端空数据覆盖
       aiPresets: mergePresetLists(cloudSettings?.aiPresets || [], localSettings?.aiPresets || []),
+      reminders: mergeReminderLists(cloudSettings?.reminders || [], localSettings?.reminders || []),
       aiCurrentPresetId: localSettings.aiCurrentPresetId || cloudSettings.aiCurrentPresetId || '',
       aiApiKey: localSettings.aiApiKey || cloudSettings.aiApiKey || '',
       aiModel: localSettings.aiModel || cloudSettings.aiModel || 'deepseek-v4-flash',
@@ -4165,9 +4149,11 @@ ipcMain.handle('cloud-sync-check', async () => {
         aiMaxToolRounds: currentData.settings?.aiMaxToolRounds || 30,  // ★ P2-1
         aiUserName: currentData.settings?.aiUserName || '我',
         aiUserAvatar: currentData.settings?.aiUserAvatar || '',
-        aiAgentAvatar: currentData.settings?.aiAgentAvatar || '',
-        aiPresets: currentData.settings?.aiPresets || [],
-        aiCurrentPresetId: currentData.settings?.aiCurrentPresetId || ''
+      aiAgentAvatar: currentData.settings?.aiAgentAvatar || '',
+      aiPresets: currentData.settings?.aiPresets || [],
+      aiCurrentPresetId: currentData.settings?.aiCurrentPresetId || '',
+      // ★ 提醒保护：下载/导入写回时不得丢弃本地提醒
+      reminders: currentData.settings?.reminders || []
       };
 
       const writeResult = await writeData(
@@ -4628,6 +4614,8 @@ ipcMain.handle('cloud-sync-check', async () => {
       // 预设管理
       aiPresets: data.settings.aiPresets,
       aiCurrentPresetId: data.settings.aiCurrentPresetId,
+      // ★ 提醒保护：保存设置时不得丢弃 reminders
+      reminders: data.settings.reminders || [],
       // GitHub 版本同步配置
       githubToken: data.settings.githubToken
     };

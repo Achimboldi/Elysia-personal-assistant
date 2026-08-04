@@ -4,7 +4,7 @@
  * 25个工具，8大类（不含密钥操作）
  */
 
-const { readData, writeData, getCurrentUserId, readDailyTasks, createDailyTask, updateDailyTask, deleteDailyTask } = require('./data-service');
+const { readData, writeData, getCurrentUserId } = require('./data-service');
 const { sendToAllWindows: broadcast } = require('./main-utils');
 const { v4: uuidv4 } = require('uuid');
 const { safeLog, safeError, getCurrentAppPath } = require('./main-utils');
@@ -526,60 +526,6 @@ const TOOL_DEFINITIONS = [
       }
     }
   },
-  // ── 今日任务工具 ──
-  {
-    type: 'function',
-    function: {
-      name: 'createDailyTask',
-      description: '创建一条今日任务。今日任务是独立的简短待办，与普通任务分开管理。用户说"今天要..."、"加个今日任务"等时使用。',
-      parameters: {
-        type: 'object',
-        properties: {
-          title: { type: 'string', description: '任务名称，简短清晰，≤100字' }
-        },
-        required: ['title']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'listDailyTasks',
-      description: '查看今日所有今日任务。用户说"今天有什么任务"、"今日任务有哪些"、"看一下今日待办"等时使用。无参数。',
-      parameters: { type: 'object', properties: {} }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'updateDailyTask',
-      description: '更新今日任务状态（完成/取消完成）。用户说"把XX勾掉"、"XX做完了"、"标记完成"等时使用。',
-      parameters: {
-        type: 'object',
-        properties: {
-          title: { type: 'string', description: '任务名称（与创建时的 title 一致）' },
-          taskId: { type: 'string', description: '任务ID（知道时传入）' },
-          completed: { type: 'boolean', description: '是否完成，true=标记完成，false=取消完成' }
-        },
-        required: ['completed']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'deleteDailyTask',
-      description: '删除一条今日任务。用户说"删除XX"、"移除XX"等时使用。',
-      parameters: {
-        type: 'object',
-        properties: {
-          title: { type: 'string', description: '任务名称' },
-          taskId: { type: 'string', description: '任务ID（知道时传入）' }
-        },
-        required: []
-      }
-    }
-  },
   // ========== 自我迭代（6）==========
   // ★ AI 可读自己的源码、维护自己的行为规则、在用户确认下修改代码
   {
@@ -904,35 +850,6 @@ async function executeToolCall(toolCall, confirmCallback) {
       safeError('[昔涟工具] update_current_state 执行失败:', e);
       return { success: false, message: `状态更新失败: ${e.message}` };
     }
-  }
-
-  // 今日任务工具（主进程内直接读写，避免 IPC）
-  if (name === 'createDailyTask') {
-    const task = { title: args.title, completed: false, dailyDate: new Date().toISOString().slice(0, 10) };
-    const r = await createDailyTask(task);
-    return { success: r.success, message: r.success ? `已创建今日任务「${args.title}」` : (r.message || '创建失败') };
-  }
-  if (name === 'listDailyTasks') {
-    const tasks = readDailyTasks();
-    if (!tasks || !tasks.length) return { success: true, message: '当前没有今日任务。' };
-    const today = new Date().toISOString().slice(0, 10);
-    const list = tasks.filter(t => !t.dailyDate || t.dailyDate === today)
-      .map(t => `${t.completed ? '✓' : '○'} ${t.title}`).join('\n');
-    return { success: true, message: '今日任务：\n' + (list || '全部已完成 ✓') };
-  }
-  if (name === 'updateDailyTask') {
-    const all = readDailyTasks();
-    const found = (all || []).find(dt => dt.title === args.title || String(dt.id) === String(args.taskId));
-    if (!found) return { success: false, message: `未找到今日任务「${args.title || args.taskId}」` };
-    const r = await updateDailyTask(found.id, { completed: args.completed !== false });
-    return { success: r.success, message: r.success ? `今日任务「${found.title}」已${args.completed !== false ? '完成' : '取消完成'}` : (r.message || '更新失败') };
-  }
-  if (name === 'deleteDailyTask') {
-    const all = readDailyTasks();
-    const found = (all || []).find(dt => dt.title === args.title || String(dt.id) === String(args.taskId));
-    if (!found) return { success: false, message: `未找到今日任务「${args.title || args.taskId}」` };
-    const r = await deleteDailyTask(found.id);
-    return { success: r.success, message: r.success ? `已删除今日任务「${found.title}」` : (r.message || '删除失败') };
   }
 
   const executor = executors[name];

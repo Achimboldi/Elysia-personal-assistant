@@ -174,21 +174,36 @@ async function saveTask() {
   const validSubtasks = subtasks.filter(s => s.title.trim());
   
   const progress = document.getElementById('progress').value;
-  const taskData = {
-    title: title,
-    description: description,
-    startDate: startDate,
-    endDate: endDate,
-    priority: document.getElementById('priority').value,
-    progress: progress,
-    completed: progress === 'completed',
-    tags: tags,
-    subtasks: validSubtasks
-  };
+  const priority = document.getElementById('priority').value;
 
   if (currentTask) {
-    await ipcRenderer.invoke('update-task', currentTask.id, taskData);
+    // ★ 修复：只提交有差异的字段，避免表单里的旧值（优先级/进度等）覆盖主界面新改动
+    const patch = {};
+    if (title !== (currentTask.title || '')) patch.title = title;
+    if (description !== (currentTask.description || '')) patch.description = description;
+    if (startDate !== (currentTask.startDate || '')) patch.startDate = startDate;
+    if (endDate !== (currentTask.endDate || '')) patch.endDate = endDate;
+    if (priority !== (currentTask.priority || 'normal')) patch.priority = priority;
+    if (progress !== (currentTask.progress || 'pending')) patch.progress = progress;
+    if (JSON.stringify(tags || []) !== JSON.stringify(currentTask.tags || [])) patch.tags = tags;
+    if (JSON.stringify(validSubtasks) !== JSON.stringify(currentTask.subtasks || [])) patch.subtasks = validSubtasks;
+    if (progress === 'completed' && currentTask.completed !== true) patch.completed = true;
+    if (progress !== 'completed' && currentTask.completed === true) patch.completed = false;
+    if (Object.keys(patch).length > 0) {
+      await ipcRenderer.invoke('update-task', currentTask.id, patch);
+    }
   } else {
+    const taskData = {
+      title: title,
+      description: description,
+      startDate: startDate,
+      endDate: endDate,
+      priority: priority,
+      progress: progress,
+      completed: progress === 'completed',
+      tags: tags,
+      subtasks: validSubtasks
+    };
     await ipcRenderer.invoke('add-task', taskData);
   }
 

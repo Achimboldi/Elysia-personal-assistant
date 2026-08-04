@@ -41,20 +41,43 @@ class TaskManager {
     try {
       const index = this.tasks.findIndex(t => String(t.id) === String(taskId));
       const oldTask = index !== -1 ? { ...this.tasks[index] } : null;
+      const beforePrio = oldTask ? oldTask.priority : '?';
+      const beforeProg = oldTask ? oldTask.progress : '?';
       
       if (index !== -1) {
         this.tasks[index] = { ...this.tasks[index], ...updates };
       }
       
+      // ★ 临时诊断：记录提交内容和本地替换结果
+      try {
+        ipcRenderer.invoke('debug-priority-log', `[TM-UT] id=${taskId} keys=${Object.keys(updates || {}).join(',')} beforeP=${beforePrio} beforeG=${beforeProg} afterP=${this.tasks[index] ? this.tasks[index].priority : '?'} afterG=${this.tasks[index] ? this.tasks[index].progress : '?'}`).catch(() => {});
+      } catch (e) {}
+
       const result = await ipcRenderer.invoke('update-task', taskId, updates);
+      // ★ 临时诊断：记录 IPC 返回
+      try {
+        ipcRenderer.invoke('debug-priority-log', `[TM-RES] id=${taskId} success=${result && result.success} keys=${Object.keys(updates || {}).join(',')}`).catch(() => {});
+      } catch (e) {}
       if (!result.success && oldTask) {
         if (index !== -1) {
-          this.tasks[index] = oldTask;
+          // ★ 修复：失败时只回滚本次提交的字段，避免把用户紧接着修改的其他字段（进度/子任务）也冲掉
+          const current = this.tasks[index];
+          const rollback = {};
+          for (const key of Object.keys(updates || {})) {
+            rollback[key] = oldTask[key];
+          }
+          this.tasks[index] = { ...current, ...rollback };
         }
+        try {
+          ipcRenderer.invoke('debug-priority-log', `[TM-ROLLBACK] id=${taskId} keys=${Object.keys(updates || {}).join(',')} restoredP=${this.tasks[index] ? this.tasks[index].priority : '?'} restoredG=${this.tasks[index] ? this.tasks[index].progress : '?'}`).catch(() => {});
+        } catch (e) {}
       }
       return result;
     } catch (error) {
       console.error('[TaskManager] 更新任务失败:', error);
+      try {
+        ipcRenderer.invoke('debug-priority-log', `[TM-ERR] id=${taskId} keys=${Object.keys(updates || {}).join(',')} err=${error.message}`).catch(() => {});
+      } catch (e) {}
       return { success: false, message: '更新任务失败: ' + error.message };
     }
   }

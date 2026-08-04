@@ -125,6 +125,81 @@ function invalidateCache() {
   lastDataLoadTime = 0;
 }
 
+// ★ 获取条目最近修改时间（毫秒时间戳），用于写盘前合并保护
+function getItemLastModifiedTime(item) {
+  if (!item) return 0;
+  const candidates = [
+    item.updatedAt,
+    item.lastModified,
+    item.lastUpdated,
+    item.modifiedAt,
+    item.editTime,
+    item.createdAt,
+    item.timestamp
+  ];
+  let maxTime = 0;
+  for (const t of candidates) {
+    if (t) {
+      const time = new Date(t).getTime();
+      if (!isNaN(time) && time > maxTime) {
+        maxTime = time;
+      }
+    }
+  }
+  return maxTime;
+}
+
+// ★ 写盘前合并保护：防止持有旧快照的写盘覆盖磁盘上更新的条目。
+// 以传入数据为基础，对同 id 且磁盘时间戳更新的条目，保留磁盘版本；
+// 磁盘独有且未标记删除的条目保留（防止旧快照抹掉新建数据）；
+// 已标记删除的 id 一律丢弃（尊重删除）。
+function mergeIncomingWithDisk(incoming, diskItems, deletedIds) {
+  if (incoming === undefined) return undefined;
+  if (!Array.isArray(incoming)) return incoming;
+  const deletedSet = new Set(deletedIds || []);
+  const incomingMap = new Map();
+  for (const it of (incoming || [])) {
+    if (it && it.id != null) incomingMap.set(String(it.id), it);
+  }
+  const diskMap = new Map();
+  for (const it of (diskItems || [])) {
+    if (it && it.id != null) diskMap.set(String(it.id), it);
+  }
+  const result = [];
+  const seen = new Set();
+  for (const item of (incoming || [])) {
+    if (!item || item.id == null) {
+      result.push(item);
+      continue;
+    }
+    const id = String(item.id);
+    seen.add(id);
+    if (deletedSet.has(id)) continue;
+    const disk = diskMap.get(id);
+    if (!disk) {
+      result.push(item);
+      continue;
+    }
+    const tIn = getItemLastModifiedTime(item);
+    const tDisk = getItemLastModifiedTime(disk);
+    // 磁盘时间戳严格更新即保留磁盘（同一毫秒内视为相等，正常用传入），
+    // 防止旧快照覆盖用户刚保存的新编辑
+    if (tDisk > 0 && tDisk > tIn) {
+      result.push(disk);
+    } else {
+      result.push(item);
+    }
+  }
+  // 磁盘独有且未标记删除的条目保留（防止旧快照写盘抹掉新建数据）
+  for (const it of (diskItems || [])) {
+    if (!it || it.id == null) continue;
+    const id = String(it.id);
+    if (seen.has(id) || deletedSet.has(id)) continue;
+    result.push(it);
+  }
+  return result;
+}
+
 function readData(forceReload = false) {
   const now = Date.now();
 
@@ -263,76 +338,6 @@ function readData(forceReload = false) {
   };
 }
 
-// ============================================================
-// 每日任务直接读写（供主进程内 xilian-tools 使用，避免 IPC）
-// ============================================================
-function readDailyTasks() {
-  return readData().dailyTasks || [];
-}
-
-async function _writeDailyTasksRaw(dailyTasks) {
-  const dataPath = getDataFilePath();
-  const maxWait = 2000;
-  const startWait = Date.now();
-  while (global._elysiaWriteLock && (Date.now() - startWait) < maxWait) {
-    await new Promise(r => setTimeout(r, 50));
-  }
-  if (global._elysiaWriteLock) {
-    console.error('[data-service] _writeDailyTasksRaw 写入超时，锁未释放');
-    return false;
-  }
-  global._elysiaWriteLock = true;
-  try {
-    const exists = fs.existsSync(dataPath);
-    const raw = exists ? JSON.parse(fs.readFileSync(dataPath, 'utf8')) : {};
-    raw.dailyTasks = dailyTasks;
-    raw.dataModified = new Date().toISOString();
-    fs.writeFileSync(dataPath, JSON.stringify(raw, null, 2), 'utf8');
-    invalidateCache();
-    return true;
-  } catch (e) {
-    console.error('[data-service] _writeDailyTasksRaw 失败:', e.message);
-    return false;
-  } finally {
-    global._elysiaWriteLock = false;
-  }
-}
-
-async function createDailyTask(dailyTask) {
-  const list = readDailyTasks();
-  const now = new Date().toISOString();
-  const task = {
-    ...dailyTask,
-    id: dailyTask.id || require('uuid').v4(),
-    createdAt: dailyTask.createdAt || now,
-    completed: dailyTask.completed || false,
-    dailyDate: dailyTask.dailyDate || now.slice(0, 10)
-  };
-  list.push(task);
-  const ok = await _writeDailyTasksRaw(list);
-  if (ok) sendToAllWindows('daily-tasks-updated');
-  return { success: ok, dailyTask: task };
-}
-
-async function updateDailyTask(taskId, updates) {
-  const list = readDailyTasks();
-  const idx = list.findIndex(dt => String(dt.id) === String(taskId));
-  if (idx === -1) return { success: false, message: 'task not found' };
-  Object.assign(list[idx], updates, { updatedAt: new Date().toISOString() });
-  const ok = await _writeDailyTasksRaw(list);
-  if (ok) sendToAllWindows('daily-tasks-updated');
-  return { success: ok, dailyTask: list[idx] };
-}
-
-async function deleteDailyTask(taskId) {
-  const list = readDailyTasks();
-  const filtered = list.filter(dt => String(dt.id) !== String(taskId));
-  if (filtered.length === list.length) return { success: false, message: 'task not found' };
-  const ok = await _writeDailyTasksRaw(filtered);
-  if (ok) sendToAllWindows('daily-tasks-updated');
-  return { success: ok };
-}
-
 function deduplicateItems(items) {
   const seenContentHashes = new Set();
   return items.filter(item => {
@@ -437,11 +442,27 @@ function cleanupDuplicateData() {
 
 async function writeData(tasks, memos, expenses, budgets, settings, translationStats, categoryBudgets, secrets, journals, updateDataModified, chatHistory, chatRooms, chatHistoryStore, chatHistoryLimit, deletedItems) {
   // ★ 写锁：防止并发写入
-  if (global._elysiaWriteLock) { return { success: false, message: '写入繁忙，请重试' }; }
+  // ★ 修改：不再直接返回"写入繁忙"，而是等待锁释放后再写，避免与 dataManager 的
+  //   写盘并发时静默丢失本次保存（任务编辑/聊天保存互相覆盖的根因）
+  let _lockWaitMs = 0;
+  while (global._elysiaWriteLock && _lockWaitMs < 5000) {
+    await new Promise(r => setTimeout(r, 10));
+    _lockWaitMs += 10;
+  }
+  if (global._elysiaWriteLock) {
+    return { success: false, message: '写入繁忙，请稍后重试' };
+  }
   global._elysiaWriteLock = true;
   
   try {
     invalidateCache();
+    // ★ 双缓存联动：同时失效 dataManager 缓存，防止另一方用旧数据整表覆盖（任务优先级/提醒丢失根因）
+    try {
+      const { dataManager } = require('./data-manager');
+      if (dataManager && typeof dataManager.invalidateCache === 'function') {
+        await dataManager.invalidateCache();
+      }
+    } catch (e) {}
     const dataPath = getDataFilePath();
     const currentUserId = getCurrentUserId();
     
@@ -455,12 +476,38 @@ async function writeData(tasks, memos, expenses, budgets, settings, translationS
     // ★ 修复：所有字段统一处理 undefined 的情况
     // 原理：调用方如果没传某个参数（undefined），说明它不想改这个字段，
     //       应该从磁盘现有数据里保留，而不是直接写空数组覆盖
-    const uniqueTasks = deduplicateItems(tasks !== undefined ? (tasks || []) : (existingData?.tasks || []));
-    const uniqueMemos = deduplicateItems(memos !== undefined ? (memos || []) : (existingData?.memos || []));
-    const uniqueExpenses = deduplicateItems(expenses !== undefined ? (expenses || []) : (existingData?.expenses || []));
-    const uniqueBudgets = deduplicateItems(budgets !== undefined ? (budgets || []) : (existingData?.budgets || []));
-    const uniqueSecrets = deduplicateItems(secrets !== undefined ? (secrets || []) : (existingData?.secrets || []));
-    const uniqueJournals = deduplicateItems(journals !== undefined ? journalsArray : (existingData?.journals || []));
+    // ★ 写盘前合并保护：持有旧快照的调用方（如聊天/提醒保存）不得覆盖磁盘上
+    //   用户刚编辑过的条目（任务优先级/进度/子任务等）。磁盘明显更新者保留。
+    const uniqueTasks = deduplicateItems(mergeIncomingWithDisk(
+      tasks !== undefined ? (tasks || []) : (existingData?.tasks || []),
+      existingData?.tasks || [],
+      existingData?.deletedItems?.tasks || []
+    ));
+    const uniqueMemos = deduplicateItems(mergeIncomingWithDisk(
+      memos !== undefined ? (memos || []) : (existingData?.memos || []),
+      existingData?.memos || [],
+      existingData?.deletedItems?.memos || []
+    ));
+    const uniqueExpenses = deduplicateItems(mergeIncomingWithDisk(
+      expenses !== undefined ? (expenses || []) : (existingData?.expenses || []),
+      existingData?.expenses || [],
+      existingData?.deletedItems?.expenses || []
+    ));
+    const uniqueBudgets = deduplicateItems(mergeIncomingWithDisk(
+      budgets !== undefined ? (budgets || []) : (existingData?.budgets || []),
+      existingData?.budgets || [],
+      existingData?.deletedItems?.budgets || []
+    ));
+    const uniqueSecrets = deduplicateItems(mergeIncomingWithDisk(
+      secrets !== undefined ? (secrets || []) : (existingData?.secrets || []),
+      existingData?.secrets || [],
+      existingData?.deletedItems?.secrets || []
+    ));
+    const uniqueJournals = deduplicateItems(mergeIncomingWithDisk(
+      journals !== undefined ? journalsArray : (existingData?.journals || []),
+      existingData?.journals || [],
+      existingData?.deletedItems?.journals || []
+    ));
 
     const resolvedChatHistory = chatHistory !== undefined ? chatHistory : (existingData?.chatHistory || []);
     const resolvedChatRooms = chatRooms !== undefined ? (Array.isArray(chatRooms) ? chatRooms : (existingData?.chatRooms || [])) : (existingData?.chatRooms || []);
@@ -534,6 +581,12 @@ async function writeData(tasks, memos, expenses, budgets, settings, translationS
       try { await fs.promises.unlink(bakFilePath); } catch {}
     } catch {}
     console.error('[writeData] 失败:', e.message);
+    // ★ 临时诊断：写盘失败记录到诊断日志
+    try {
+      const logDir = path.join(path.dirname(fallbackDataPath), 'app-cache');
+      if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+      fs.appendFileSync(path.join(logDir, 'priority-debug.log'), `[SVC-WRITE-FAIL] ${e.message}\n`);
+    } catch (e2) {}
     return { success: false, message: '写入失败: ' + e.message };
   } finally {
     global._elysiaWriteLock = false;
@@ -630,11 +683,9 @@ module.exports = {
   updateAdminSettings,
   readAdminData,
   invalidateCache,
+  getItemLastModifiedTime,
+  mergeIncomingWithDisk,
   readData,
-  readDailyTasks,
-  createDailyTask,
-  updateDailyTask,
-  deleteDailyTask,
   deduplicateItems,
   cleanupDuplicateData,
   writeData,

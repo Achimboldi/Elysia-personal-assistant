@@ -283,126 +283,6 @@ const XilianUI = {
     },
 
     // ============================================================
-    // 工具调用卡片
-    // ============================================================
-
-    appendToolCard({ name, status, args }) {
-        const container = document.getElementById('xilianMessages');
-        if (!container) return;
-
-        const icons = { running: '⏳', done: '✅', error: '❌' };
-        const labels = { running: '执行中', done: '已完成', error: '失败' };
-        const displayName = this.getToolDisplayName(name);
-        const argsText = args ? this._formatToolArgs(name, args) : '';
-        const cardId = 'tool-card-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-
-        const cardEl = document.createElement('div');
-        cardEl.className = 'xilian-tool-card';
-        cardEl.id = cardId;
-        cardEl.setAttribute('data-tool-status', status);
-        cardEl.setAttribute('data-tool-name', name);
-        // 运行中默认展开，完成后默认折叠
-        cardEl.setAttribute('data-expanded', status === 'running' ? 'true' : 'false');
-        cardEl.innerHTML = `
-            <div class="xilian-tool-card-header">
-                <span class="xilian-tool-card-icon">${icons[status] || '🔧'}</span>
-                <span class="xilian-tool-card-name">${displayName}</span>
-                <span class="xilian-tool-card-status">${labels[status] || status}</span>
-                <span class="xilian-tool-card-toggle">${status === 'running' ? '▼' : '▶'}</span>
-            </div>
-            <div class="xilian-tool-card-body">
-                ${argsText ? `<div class="xilian-tool-card-section"><span class="xilian-tool-card-label">参数</span><pre class="xilian-tool-card-args">${this.escapeHtml(argsText)}</pre></div>` : ''}
-                <div class="xilian-tool-card-section xilian-tool-card-result-section" style="display:none;">
-                    <span class="xilian-tool-card-label">结果</span>
-                    <pre class="xilian-tool-card-result"></pre>
-                </div>
-            </div>
-        `;
-
-        // 点击头部切换展开/折叠
-        const header = cardEl.querySelector('.xilian-tool-card-header');
-        header.addEventListener('click', () => this._toggleToolCard(cardId));
-
-        container.appendChild(cardEl);
-        this.scrollToBottom();
-    },
-
-    _toggleToolCard(cardId) {
-        const card = document.getElementById(cardId);
-        if (!card) return;
-        const expanded = card.getAttribute('data-expanded') === 'true';
-        card.setAttribute('data-expanded', expanded ? 'false' : 'true');
-        const toggle = card.querySelector('.xilian-tool-card-toggle');
-        if (toggle) toggle.textContent = expanded ? '▶' : '▼';
-    },
-
-    _formatToolArgs(name, args) {
-        try {
-            if (!args || typeof args !== 'object') return String(args || '');
-            // 对日志、备忘录等内容型参数做友好展示
-            if (args.content && typeof args.content === 'string') {
-                return args.content.length > 120 ? args.content.slice(0, 120) + '...' : args.content;
-            }
-            if (args.title && typeof args.title === 'string') {
-                return args.title;
-            }
-            if (args.description && typeof args.description === 'string') {
-                return args.description;
-            }
-            return JSON.stringify(args, null, 2);
-        } catch (e) {
-            return String(args || '');
-        }
-    },
-
-    updateLastToolCard({ name, status, message, args }) {
-        const cards = document.querySelectorAll('.xilian-tool-card[data-tool-status="running"]');
-        const card = cards[cards.length - 1];
-        if (!card) {
-            // 如果没有运行中的卡片，可能是延迟到达的结果，追加一张已完成的卡片
-            this.appendToolCard({ name, status, args });
-            const newCards = document.querySelectorAll('.xilian-tool-card');
-            this._finalizeToolCard(newCards[newCards.length - 1], status, message);
-            return;
-        }
-
-        this._finalizeToolCard(card, status, message);
-    },
-
-    _finalizeToolCard(card, status, message) {
-        const icons = { done: '✅', error: '❌' };
-        const labels = { done: '已完成', error: '失败' };
-        card.setAttribute('data-tool-status', status);
-        card.setAttribute('data-expanded', 'false');
-
-        const iconEl = card.querySelector('.xilian-tool-card-icon');
-        if (iconEl) iconEl.textContent = icons[status] || '🔧';
-
-        const statusEl = card.querySelector('.xilian-tool-card-status');
-        if (statusEl) statusEl.textContent = labels[status] || status;
-
-        const toggleEl = card.querySelector('.xilian-tool-card-toggle');
-        if (toggleEl) toggleEl.textContent = '▶';
-
-        const resultSection = card.querySelector('.xilian-tool-card-result-section');
-        const resultEl = card.querySelector('.xilian-tool-card-result');
-        if (message && resultEl) {
-            resultEl.textContent = message;
-            if (resultSection) resultSection.style.display = '';
-        }
-
-        // 不再自动移除，永久保留在聊天记录中
-    },
-
-    hideToolCards() {
-        // 把所有仍在 running 状态的卡片标记为 done（兜底）
-        const cards = document.querySelectorAll('.xilian-tool-card[data-tool-status="running"]');
-        cards.forEach(card => {
-            this._finalizeToolCard(card, 'done', '流式响应结束');
-        });
-    },
-
-    // ============================================================
     // ★ 内嵌工具执行进度面板（助手消息气泡内）
     // ============================================================
 
@@ -661,7 +541,7 @@ const XilianUI = {
 
     showToolStatus(show, text) {
         // 已禁用输入框下方的工具状态提示
-        // 工具调用状态现在只通过聊天中的 .xilian-tool-card 展示
+        // 工具调用状态现在只通过消息气泡内的进度面板展示
         return;
 
         // 保留原实现注释，便于后续恢复：

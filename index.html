@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elysia</title>
-    <link rel="stylesheet" href="styles.css?v=2026080404">
+    <link rel="stylesheet" href="styles.css?v=2026080408">
 </head>
 <body>
     <div id="loadingScreen" class="loading-screen" style="display: none;">
@@ -141,6 +141,7 @@
                     <div class="panel-header-right">
                         <button id="addTaskBtn" class="add-task-btn panel-add-btn" title="新建任务" data-view-toggle="tasks">+</button>
                         <button id="addSecretBtn" class="add-task-btn panel-add-btn" title="添加密钥" data-view-toggle="secrets" style="display:none;">+</button>
+                        <button id="addReminderBtn" class="add-task-btn panel-add-btn" title="新建提醒" style="display:none;">+</button>
                     </div>
                 </div>
                 <div class="task-content">
@@ -153,24 +154,12 @@
                                     <button id="taskSidebarCollapseBtn" class="task-sidebar-collapse" title="收起导航栏" type="button">«</button>
                                 </div>
                                 <div class="task-sidebar-group">
-                                    <div class="task-sidebar-group-title">每日任务 <span id="taskSidebarDailyCount" class="task-sidebar-count"></span></div>
-                                    <div id="taskSidebarDailyList" class="task-sidebar-list"></div>
-                                </div>
-                                <div class="task-sidebar-group">
                                     <div class="task-sidebar-group-title">主任务 <span id="taskSidebarMainCount" class="task-sidebar-count"></span></div>
                                     <div id="taskSidebarMainList" class="task-sidebar-list"></div>
                                 </div>
                             </div>
                             <button id="taskSidebarExpandBtn" class="task-sidebar-expand" title="展开任务导航" type="button">»</button>
                             <div class="task-scroll-area">
-                                <div id="dailyTasksSection" class="daily-tasks-section" style="display:none">
-                                    <div class="daily-tasks-header">
-                                        <span class="daily-tasks-title">今日任务</span>
-                                        <span class="daily-tasks-count" id="dailyTasksCount"></span>
-                                    </div>
-                                    <div id="dailyTasksContainerList" class="daily-tasks-list"></div>
-                                    <div class="daily-task-add-row" id="dailyTaskAddRow">+ 添加今日任务</div>
-                                </div>
                                 <div class="daily-section">
                                     <div id="dailyTasksContainer" class="tasks-list"></div>
                                 </div>
@@ -272,13 +261,6 @@
                         </div>
                         <!-- 提醒视图 -->
                         <div id="remindersView" class="view-panel">
-                            <div class="reminders-toolbar">
-                                <div class="reminders-toolbar-title">
-                                    <span class="reminders-title-text">提醒</span>
-                                    <span class="reminders-subtitle">到点自动触发 · 可绑定智能体按提示词执行</span>
-                                </div>
-                                <button id="addReminderBtn" class="add-task-btn panel-add-btn" title="新建提醒">+</button>
-                            </div>
                             <div id="remindersList" class="reminders-list">
                                 <div class="empty-state reminders-empty">
                                     <div>暂无提醒</div>
@@ -1919,10 +1901,10 @@
         </div>
     </div>
     
-    <script src="xilian-ui.js?v=2026080401"></script>
+    <script src="xilian-ui.js?v=2026080407"></script>
     <script src="xilian-settings.js?v=2026073004"></script>
     <script src="chat-room-manager.js?v=2026073004"></script>
-    <script src="xilian-manager.js?v=2026080401"></script>
-    <script src="app.js?v=2026080403"></script>
+    <script src="xilian-manager.js?v=2026080407"></script>
+    <script src="app.js?v=2026080417"></script>
 </body>
 </html>
