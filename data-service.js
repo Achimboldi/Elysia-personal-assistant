@@ -581,12 +581,6 @@ async function writeData(tasks, memos, expenses, budgets, settings, translationS
       try { await fs.promises.unlink(bakFilePath); } catch {}
     } catch {}
     console.error('[writeData] 失败:', e.message);
-    // ★ 临时诊断：写盘失败记录到诊断日志
-    try {
-      const logDir = path.join(path.dirname(fallbackDataPath), 'app-cache');
-      if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
-      fs.appendFileSync(path.join(logDir, 'priority-debug.log'), `[SVC-WRITE-FAIL] ${e.message}\n`);
-    } catch (e2) {}
     return { success: false, message: '写入失败: ' + e.message };
   } finally {
     global._elysiaWriteLock = false;

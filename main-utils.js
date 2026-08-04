@@ -9,14 +9,35 @@ function getUserDataPath() {
   return app.getPath('userData');
 }
 
+// ★ 日志大小上限：超过后轮转归档（保留最近 2 份），防止 app.log 无限膨胀
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
+
+/**
+ * 日志文件超过上限时轮转：app.log → app.log.old → app.log.old2
+ */
+function rotateLogIfNeeded(logPath) {
+  try {
+    const stat = fs.statSync(logPath);
+    if (stat.size <= MAX_LOG_SIZE) return;
+    const bakPath = logPath + '.old';
+    const oldBakPath = logPath + '.old2';
+    if (fs.existsSync(bakPath)) {
+      fs.renameSync(bakPath, oldBakPath);
+    }
+    fs.renameSync(logPath, bakPath);
+  } catch (e) {
+  }
+}
+
 /**
  * 安全写入日志
  */
 function safeLog(...args) {
   try {
     const logPath = path.join(getUserDataPath(), 'app.log');
+    rotateLogIfNeeded(logPath);
     const logLine = `[${new Date().toISOString()}] ${args.map(arg =>
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
     ).join(' ')}\n`;
     fs.appendFileSync(logPath, logLine);
   } catch (e) {
@@ -29,8 +50,9 @@ function safeLog(...args) {
 function safeError(...args) {
   try {
     const logPath = path.join(getUserDataPath(), 'error.log');
+    rotateLogIfNeeded(logPath);
     const logLine = `[${new Date().toISOString()}] ERROR: ${args.map(arg =>
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
     ).join(' ')}\n`;
     fs.appendFileSync(logPath, logLine);
     console.error('[Elysia Error]', ...args);

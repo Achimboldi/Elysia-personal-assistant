@@ -345,12 +345,6 @@ class AppController {
    * 原来的 7 次独立 IPC 调用 → 改为 1 次同步磁盘读取
    */
   async loadAllData() {
-    // ★ 临时诊断：记录数据重载来源
-    try {
-      const { ipcRenderer } = require('electron');
-      const t521 = this.tasks.find(t => String(t.id) === '521');
-      ipcRenderer.invoke('debug-priority-log', `[LOAD-ALL] called from=${new Error().stack ? String(new Error().stack).split('\n')[2] || '?' : '?'} prev521P=${t521 ? t521.priority : '?'} prev521G=${t521 ? t521.progress : '?'}`).catch(() => {});
-    } catch (e) {}
     try {
       // ★ 统一通过 IPC 加载，确保和主进程读写同一个 data.json
       // （主进程会根据 cloudCurrentUserId 决定读 users/xxx/data.json 还是 data.json）
@@ -5338,12 +5332,6 @@ class AppController {
     });
 
     ipcRenderer.on('tasks-updated', async () => {
-      // ★ 临时诊断：记录渲染层任务数组引用关系和 521 状态
-      try {
-        const t521 = this.tasks.find(t => String(t.id) === '521');
-        const tm521 = this.taskManager.tasks.find(t => String(t.id) === '521');
-        ipcRenderer.invoke('debug-priority-log', `[TU-EVT] sameArr=${this.tasks === this.taskManager.tasks} thisP=${t521 ? t521.priority : '?'} thisG=${t521 ? t521.progress : '?'} tmP=${tm521 ? tm521.priority : '?'} tmG=${tm521 ? tm521.progress : '?'}`).catch(() => {});
-      } catch (e) {}
       this.tasks = this.taskManager.getTasks();
       this.renderCalendar();
       // ★ 优化：任务更新只刷新任务区（含侧边栏），不再连带重渲染收支/日历，减少连续编辑卡顿
@@ -6427,12 +6415,6 @@ class AppController {
 
     const task = this.tasks.find(t => String(t.id) === String(taskId));
     if (!task) return;
-
-    // ★ 临时诊断：记录操作前状态
-    try {
-      const beforeInfo = { p: task.priority, g: task.progress, sp: subtaskIndex !== undefined && task.subtasks ? task.subtasks[subtaskIndex]?.priority : undefined, sg: subtaskIndex !== undefined && task.subtasks ? task.subtasks[subtaskIndex]?.progress : undefined };
-      ipcRenderer.invoke('debug-priority-log', `[UI-OPT] id=${taskId} type=${type} value=${value} sameArr=${this.tasks === this.taskManager.tasks} before=${JSON.stringify(beforeInfo)}`).catch(() => {});
-    } catch (e) {}
 
     let changed = false;
     if (type === 'subtask' && subtaskIndex !== undefined && task.subtasks && task.subtasks[subtaskIndex]) {
@@ -7874,20 +7856,6 @@ class AppController {
         });
         tableNodeMonitor.observe(tbl, { childList: true, subtree: true });
 
-        // 同时用一个专门的 Observer 监控表格与父节点的关系
-        const parentObserver = new MutationObserver(() => {});
-        // 用定时器检查 isConnected 状态变化
-        const prevParent = tbl.parentNode;
-        setInterval(() => {
-          if (currentTable === tbl && !tbl.isConnected && prevParent !== null) {
-            console.log('[表格诊断-守护] ⚠️ 表格脱离DOM树!',
-              'prevParent=', prevParent ? prevParent.tagName : 'none',
-              'currentTable===tbl', currentTable === tbl,
-              'stack=', new Error().stack.split('\n').slice(1, 6).join(' | '));
-          }
-        }, 50);
-        // 10秒后自动清理定时器
-        setTimeout(() => {/* 定时器会在 GC 时回收 */}, 10000);
       } catch (_) {}
     };
 
@@ -7896,14 +7864,6 @@ class AppController {
       try {
         if (!currentTable || !currentTable.isConnected) return;
         showFor(currentTable);
-        const tdCount = currentTable.querySelectorAll('td').length;
-        console.log('[表格诊断] 操作完成, td数=', tdCount, 'tr数=', snapRows());
-        // 多时间点精密采样，定位消失时刻
-        [10, 30, 60, 100, 150, 200, 300, 500].forEach(ms => {
-          setTimeout(() => {
-            console.log('[表格诊断] 快照 +' + ms + 'ms tr数=', snapRows());
-          }, ms);
-        });
       } catch (e) {
         console.warn('重定位表格控件失败:', e);
       }

@@ -374,7 +374,9 @@ function createMainWindow() {
     minHeight: 650,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      // ★ 性能：启用 V8 代码缓存，二次启动时跳过 JS 重新编译，加快冷启动
+      v8CacheOptions: 'code'
     }
   });
 
@@ -767,12 +769,6 @@ function setupIpcHandlers() {
     // ★ 修复：改用"队列最新状态"（优先返回写队列中尚未落盘的编辑），
     //   避免 loadAllData 读到磁盘旧值，把用户刚保存的优先级/进度回退掉
     const data = await dataManager._getCurrentData();
-    // ★ 临时诊断：记录 load-all-data 返回时 521 的状态
-    try {
-      const t521 = (data.tasks || []).find(t => String(t.id) === '521');
-      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
-      fs.appendFileSync(logPath, `[LOAD-ALL-MAIN] 521P=${t521 ? t521.priority : '?'} 521G=${t521 ? t521.progress : '?'}\n`);
-    } catch (e) {}
     // ★ 预热 data-service 同步缓存，避免后续 readData() 重复读盘
     readData();
     return {
@@ -816,33 +812,11 @@ function setupIpcHandlers() {
   
   ipcMain.handle('update-task', async (event, taskId, updates) => {
     const taskData = { ...updates, id: taskId };
-    // ★ 临时调试4：主进程收到的补丁 + 合并前优先级
-    try {
-      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
-      const dm = require('./data-manager');
-      const cur = await dm.dataManager.readData();
-      const t = (cur.tasks || []).find(x => String(x.id) === String(taskId));
-      fs.appendFileSync(logPath, `[M4] id=${taskId} keys=${Object.keys(updates || {}).join(',')} incomingPrio=${updates && updates.priority} diskPrio=${t ? t.priority : '?'}\n`);
-    } catch (e) {}
     const result = await updateData('task', taskData);
-    // ★ 临时诊断：记录主进程处理结果
-    try {
-      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
-      fs.appendFileSync(logPath, `[MAIN-RES] id=${taskId} keys=${Object.keys(updates || {}).join(',')} writeSuccess=${result && result.writeResult && result.writeResult.success} msg=${result && result.writeResult ? result.writeResult.message : '?'}\n`);
-    } catch (e) {}
     if (result.writeResult.success) {
       sendToAllWindows('tasks-updated');
     }
     return { success: result.writeResult.success, task: taskData, message: result.writeResult.message };
-  });
-
-  // ★ 临时调试4：渲染端日志
-  ipcMain.handle('debug-priority-log', async (event, line) => {
-    try {
-      const logPath = path.join(path.dirname(getDataFilePath()), 'app-cache', 'priority-debug.log');
-      fs.appendFileSync(logPath, `${line}\n`);
-    } catch (e) {}
-    return { success: true };
   });
 
 
@@ -5342,19 +5316,24 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
-  cleanupForeignUserData();
-  
-  try {
-    cleanupDuplicateData();
-  } catch (e) {
-    console.error('启动时清理重复数据失败:', e);
-  }
-  
+  // ★ 性能：先创建窗口/托盘，让应用尽快进入可交互状态；
+  //   数据清理（去重/跨用户过滤）不依赖窗口，移到其后执行
   createMainWindow();
   createTray();
   setupGlobalHotkeys();
   setupAutoLaunch();
   setupIpcHandlers();
+
+  try {
+    cleanupForeignUserData();
+  } catch (e) {
+    console.error('启动时清理跨用户数据失败:', e);
+  }
+  try {
+    cleanupDuplicateData();
+  } catch (e) {
+    console.error('启动时清理重复数据失败:', e);
+  }
 
   // ★ 提醒触发成功 → 任务栏闪烁（回调注册；模块缺失/异常不影响应用启动）
   if (reminderManager && typeof reminderManager.setOnReminderFired === 'function') {

@@ -744,11 +744,6 @@ class DataManager {
       return { success: true, message: '保存成功' };
     } catch (e) {
       console.error('[DataManager] 写入数据失败:', e);
-      // ★ 临时诊断：写盘失败记录到诊断日志
-      try {
-        const logPath = require('path').join(require('path').dirname(await this.getDataFilePath()), 'app-cache', 'priority-debug.log');
-        require('fs').appendFileSync(logPath, `[WRITE-FAIL] ${e.message}\n`);
-      } catch (e2) {}
       return { success: false, message: '保存失败: ' + e.message };
     }
   }
