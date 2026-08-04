@@ -2,16 +2,24 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } = require(
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
-const AutoLaunch = require('auto-launch');
-const { uIOhook } = require('uiohook-napi');
 const { v4: uuidv4 } = require('uuid');
-const CloudSync = require('./cloud-sync');
-const UpdateManager = require('./update-manager');
-const CryptoManager = require('./crypto-manager');
 const { dataManager } = require('./data-manager');
 const { safeLog, safeError, normalizeDate, generateContentHash, sendToAllWindows, getCurrentAppPath, grayscaleImage, copyDirSync, getCurrentVersion, getUserDataPath } = require('./main-utils');
 const { getDataFilePath, getCurrentUserId, isOwnedByUser, writeUserSpecificData, updateAdminSettings, readAdminData, invalidateCache, readData, deduplicateItems, cleanupDuplicateData, writeData, cleanupForeignUserData, updateData } = require('./data-service');
-const { streamChat, buildSimpleReply } = require('./xilian-agent');
+
+// ★ 延迟加载：xilian-agent 依赖 xilian-tools（工具注册表 + 网络库），仅聊天时加载
+function getXilianAgent() {
+  return require('./xilian-agent');
+}
+
+// ★ 延迟加载：cloud-sync 携带 axios 与云同步逻辑，首次 new CloudSync() 时才加载
+//   保持所有调用点 `new CloudSync(...)` 不变，通过 Proxy 拦截构造
+const CloudSync = new Proxy(function CloudSyncLazy() {}, {
+  construct(_target, args) {
+    const RealCloudSync = require('./cloud-sync');
+    return new RealCloudSync(...args);
+  }
+});
 
 // ★ 提醒模块（主进程收口：数据/频率/调度/执行/IPC）——模块异常不影响应用启动
 let reminderManager = null;
@@ -23,6 +31,8 @@ try {
 
 let lastBackupTime = 0;
 let lastBackupHash = '';
+// ★ uiohook 延迟加载引用（原生钩子模块，仅在启用全局热键时加载）
+let uIOhookRef = null;
 
 // ★ 云同步网络错误 → 用户可读文案（瞬时 DNS/连接问题不再显示裸报错）
 function friendlyCloudError(e) {
@@ -238,6 +248,8 @@ let updateManager = null;
 
 function getUpdateManager() {
   if (!updateManager) {
+    // ★ 延迟加载：更新检查模块仅在首次需要时加载
+    const UpdateManager = require('./update-manager');
     updateManager = new UpdateManager();
     updateManager.setLogger((msg) => safeLog('[UpdateManager] ' + msg));
     // ★ Git 模式不再依赖百度网盘 cloudSync
@@ -250,6 +262,8 @@ let cryptoManager = null;
 
 function getCryptoManager() {
   if (!cryptoManager) {
+    // ★ 延迟加载：加密模块仅在首次需要时加载
+    const CryptoManager = require('./crypto-manager');
     cryptoManager = new CryptoManager();
   }
   return cryptoManager;
@@ -431,7 +445,9 @@ function cleanupResources() {
   if (checkInterval) clearTimeout(checkInterval);
   if (cleanupEmptyDirsInterval) clearInterval(cleanupEmptyDirsInterval);
   
-  uIOhook.stop();
+  if (uIOhookRef) {
+    try { uIOhookRef.stop(); } catch (e) { safeError('停止全局热键失败:', e); }
+  }
   
   reminderWindows.forEach(r => {
     if (r.window && !r.window.isDestroyed()) {
@@ -530,6 +546,9 @@ function toggleMainWindow() {
 }
 
 function setupGlobalHotkeys() {
+  // ★ 延迟加载：uiohook-napi 是原生钩子模块，仅启动全局热键时加载
+  uIOhookRef = require('uiohook-napi').uIOhook;
+  const uIOhook = uIOhookRef;
   uIOhook.on('keydown', (e) => {
     if (e.keycode === 56) {
       lastAltPressTime = Date.now();
@@ -738,6 +757,8 @@ async function snoozeReminder(taskId) {
 }
 
 function setupAutoLaunch() {
+  // ★ 延迟加载：auto-launch 仅开机自启设置时用到，不必占用启动时间
+  const AutoLaunch = require('auto-launch');
   const autoLauncher = new AutoLaunch({
     name: 'Elysia'
   });
@@ -4777,7 +4798,7 @@ ipcMain.handle('cloud-sync-check', async () => {
       // 无 API Key，使用本地简单回复
       const lastUserMsg = messages?.[messages.length - 1]?.content || '';
       const chatHistory = currentData.chatHistory || [];
-      const reply = buildSimpleReply(lastUserMsg, chatHistory);
+      const reply = getXilianAgent().buildSimpleReply(lastUserMsg, chatHistory);
 
       // 模拟流式输出
       const chars = reply.split('');
@@ -4839,7 +4860,7 @@ ipcMain.handle('cloud-sync-check', async () => {
       // ★ 修复：将 signal 传递给 agent，使 chat-stop-stream 的 abort 能实际中断 fetch
       mergedConfig._signal = signal;
       
-      await streamChat(messages || [], mergedConfig, {
+      await getXilianAgent().streamChat(messages || [], mergedConfig, {
         onContent(chunk) {
           if (!sender.isDestroyed()) {
             sender.send('chat-chunk', { type: 'content', data: chunk });
