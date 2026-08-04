@@ -706,6 +706,24 @@ const XilianUI = {
         const welcome = document.querySelector('.xilian-welcome');
         if (welcome) {
             welcome.style.display = '';
+            this.refreshWelcome();
+        }
+    },
+
+    /**
+     * 刷新欢迎页内容：头像与标题跟随当前智能体（修复写死"昔涟"的问题）
+     */
+    refreshWelcome() {
+        const avatar = document.getElementById('xilianWelcomeAvatar');
+        const title = document.getElementById('xilianWelcomeTitle');
+        const agentName = this.getAgentName();
+        const avatarUrl = XilianSettings.getAgentAvatarUrl();
+        if (avatar) {
+            avatar.src = avatarUrl || '';
+            avatar.style.display = avatarUrl ? '' : 'none';
+        }
+        if (title) {
+            title.textContent = `你好，我是${agentName}`;
         }
     },
 
@@ -753,6 +771,8 @@ const XilianUI = {
 
         // 更新 + 按钮下拉菜单
         this.updateHeaderDropdown();
+        // 欢迎页跟随当前智能体刷新
+        this.refreshWelcome();
     },
 
     /**

@@ -1068,10 +1068,6 @@ class AppController {
     const clearBtn = document.getElementById('xilianClearHistoryBtn');
     const sendIcon = document.querySelector('.xilian-send-icon');
     const stopIcon = document.querySelector('.xilian-stop-icon');
-
-    // 聊天常驻右侧：与聊天交互（发送/聚焦输入框）时隐藏提醒触发红点
-    const notifyDot = document.getElementById('xilianNotifyDot');
-    const hideNotifyDot = () => { if (notifyDot) notifyDot.style.display = 'none'; };
     
     if (sendBtn && input) {
       const send = () => {
@@ -1082,7 +1078,6 @@ class AppController {
         }
         const text = input.value.trim();
         if (text) {
-          hideNotifyDot();
           input.value = '';
           input.style.height = 'auto';
           this.xilianManager.sendMessage(text);
@@ -1096,8 +1091,6 @@ class AppController {
           send();
         }
       });
-      input.addEventListener('focus', hideNotifyDot);
-      input.addEventListener('click', hideNotifyDot);
       
       // 自动调整输入框高度
       input.addEventListener('input', () => {
@@ -2704,30 +2697,6 @@ class AppController {
 
   
 
-  async saveCurrentSettings() {
-    try {
-      const settings = await ipcRenderer.invoke('get-settings');
-      this.settingsManager.savedTheme = settings.theme || 'light';
-      this.themeManager.savedTaskOpacity = settings.taskCardOpacity || '80';
-      this.themeManager.savedExpenseOpacity = settings.expenseCardOpacity || '80';
-      this.themeManager.savedFinanceOpacity = settings.financeCardOpacity || '80';
-    } catch {
-      this.settingsManager.savedTheme = 'light';
-      this.themeManager.savedTaskOpacity = '80';
-      this.themeManager.savedExpenseOpacity = '80';
-      this.themeManager.savedFinanceOpacity = '80';
-    }
-    
-    try {
-      const cloudConfig = await ipcRenderer.invoke('cloud-sync-get-config');
-      this.settingsManager.savedAutoSync = cloudConfig.autoSync || false;
-      this.settingsManager.savedSyncInterval = cloudConfig.syncInterval || 10;
-    } catch {
-      this.settingsManager.savedAutoSync = false;
-      this.settingsManager.savedSyncInterval = 10;
-    }
-  }
-
   closeSettingsModal() {
     const modal = document.getElementById('settingsModal');
     const content = modal.querySelector('.modal-content');
@@ -2743,348 +2712,6 @@ class AppController {
     }, 300);
     
     this.settingsManager.restoreSettings();
-  }
-
-  restoreSettings() {
-    this.themeManager.toggleDarkMode(this.settingsManager.savedTheme === 'dark');
-    document.getElementById('taskCardOpacity').value = this.themeManager.savedTaskOpacity;
-    document.getElementById('taskCardOpacityValue').textContent = this.themeManager.savedTaskOpacity + '%';
-    document.getElementById('expenseCardOpacity').value = this.themeManager.savedExpenseOpacity;
-    document.getElementById('expenseCardOpacityValue').textContent = this.themeManager.savedExpenseOpacity + '%';
-    document.getElementById('financeCardOpacity').value = this.themeManager.savedFinanceOpacity;
-    document.getElementById('financeCardOpacityValue').textContent = this.themeManager.savedFinanceOpacity + '%';
-    this.themeManager.applyCardOpacity();
-    
-    const autoSyncToggle = document.getElementById('autoSyncToggle');
-    if (autoSyncToggle) {
-      autoSyncToggle.checked = this.settingsManager.savedAutoSync || false;
-    }
-    const autoSyncInterval = document.getElementById('autoSyncInterval');
-    if (autoSyncInterval) {
-      autoSyncInterval.value = this.settingsManager.savedSyncInterval || 10;
-      document.getElementById('autoSyncIntervalValue').textContent = this.settingsManager.savedSyncInterval || 10;
-    }
-  }
-
-  async saveSettings() {
-    const themeMode = document.querySelector('input[name="themeMode"]:checked').value;
-    const taskOpacity = document.getElementById('taskCardOpacity').value;
-    const expenseOpacity = document.getElementById('expenseCardOpacity').value;
-    const financeOpacity = document.getElementById('financeCardOpacity').value;
-    const calendarOpacity = document.getElementById('calendarOpacity').value;
-    const budgetOpacity = document.getElementById('budgetOpacity').value;
-    const secretOpacity = document.getElementById('secretCardOpacity').value;
-    
-    const darkBackgroundImage = this.themeManager.savedDarkBackgroundImage || '';
-    const darkBackgroundPositionX = document.getElementById('darkBackgroundPositionX').value;
-    const darkBackgroundPositionY = document.getElementById('darkBackgroundPositionY').value;
-    const darkBackgroundSizeWidth = document.getElementById('darkBackgroundSizeWidth').value;
-    const darkBackgroundOpacity = document.getElementById('darkBackgroundOpacity').value;
-    const darkOverlayColor = document.getElementById('darkOverlayColor').value;
-    const darkOverlayOpacity = document.getElementById('darkOverlayOpacity').value;
-    const darkInvert = document.querySelector('input[name="darkInvert"]:checked').value;
-    
-    const lightBackgroundImage = this.themeManager.savedLightBackgroundImage || '';
-    const lightBackgroundPositionX = document.getElementById('lightBackgroundPositionX').value;
-    const lightBackgroundPositionY = document.getElementById('lightBackgroundPositionY').value;
-    const lightBackgroundSizeWidth = document.getElementById('lightBackgroundSizeWidth').value;
-    const lightBackgroundOpacity = document.getElementById('lightBackgroundOpacity').value;
-    const lightOverlayColor = document.getElementById('lightOverlayColor').value;
-    const lightOverlayOpacity = document.getElementById('lightOverlayOpacity').value;
-    const lightInvert = document.querySelector('input[name="lightInvert"]:checked').value;
-    
-    try {
-      await ipcRenderer.invoke('save-settings', {
-        theme: themeMode,
-        taskCardOpacity: taskOpacity,
-        expenseCardOpacity: expenseOpacity,
-        financeCardOpacity: financeOpacity,
-        calendarOpacity: calendarOpacity,
-        budgetOpacity: budgetOpacity,
-        secretCardOpacity: secretOpacity,
-        darkBackgroundImage: darkBackgroundImage ? encodeURIComponent(darkBackgroundImage) : '',
-        darkBackgroundPositionX: darkBackgroundPositionX,
-        darkBackgroundPositionY: darkBackgroundPositionY,
-        darkBackgroundSizeWidth: darkBackgroundSizeWidth,
-        darkBackgroundOpacity: darkBackgroundOpacity,
-        darkOverlayColor: darkOverlayColor,
-        darkOverlayOpacity: darkOverlayOpacity,
-        darkInvert: darkInvert,
-        lightBackgroundImage: lightBackgroundImage ? encodeURIComponent(lightBackgroundImage) : '',
-        lightBackgroundPositionX: lightBackgroundPositionX,
-        lightBackgroundPositionY: lightBackgroundPositionY,
-        lightBackgroundSizeWidth: lightBackgroundSizeWidth,
-        lightBackgroundOpacity: lightBackgroundOpacity,
-        lightOverlayColor: lightOverlayColor,
-        lightOverlayOpacity: lightOverlayOpacity,
-        lightInvert: lightInvert
-      });
-    } catch {
-      console.error('保存设置失败');
-    }
-    
-    await this.settingsManager.saveCloudConfigSilently();
-  }
-
-  async saveCloudConfigSilently() {
-    try {
-      const cloudAppId = document.getElementById('cloudAppId');
-      const cloudAppKey = document.getElementById('cloudAppKey');
-      const cloudAppSecret = document.getElementById('cloudAppSecret');
-      
-      if (!cloudAppId || !cloudAppKey || !cloudAppSecret) {
-        return;
-      }
-      
-      const autoSyncToggle = document.getElementById('autoSyncToggle');
-      const autoSyncInterval = document.getElementById('autoSyncInterval');
-      
-      const config = {
-        appId: cloudAppId.value,
-        appKey: cloudAppKey.value,
-        appSecret: cloudAppSecret.value,
-        autoSync: autoSyncToggle ? autoSyncToggle.checked : false,
-        syncInterval: autoSyncInterval ? parseInt(autoSyncInterval.value) : 10,
-        token: this.settingsManager.savedCloudToken || '',
-        refreshToken: this.settingsManager.savedCloudRefreshToken || '',
-        tokenExpireTime: this.settingsManager.savedCloudTokenExpireTime || 0
-      };
-      
-      const result = await ipcRenderer.invoke('cloud-sync-save-config', config);
-      if (result.success) {
-        this.settingsManager.saveCloudConfigToCache(config);
-      }
-    } catch (e) {
-      console.error('自动保存云同步配置失败:', e);
-    }
-  }
-
-  async saveSettings() {
-    const themeMode = document.querySelector('input[name="themeMode"]:checked').value;
-    const taskOpacity = document.getElementById('taskCardOpacity').value;
-    const expenseOpacity = document.getElementById('expenseCardOpacity').value;
-    const financeOpacity = document.getElementById('financeCardOpacity').value;
-    const calendarOpacity = document.getElementById('calendarOpacity').value;
-    const budgetOpacity = document.getElementById('budgetOpacity').value;
-    const secretOpacity = document.getElementById('secretCardOpacity').value;
-    
-    const darkBackgroundImage = this.themeManager.savedDarkBackgroundImage || '';
-    const darkBackgroundPositionX = document.getElementById('darkBackgroundPositionX').value;
-    const darkBackgroundPositionY = document.getElementById('darkBackgroundPositionY').value;
-    const darkBackgroundSizeWidth = document.getElementById('darkBackgroundSizeWidth').value;
-    const darkBackgroundOpacity = document.getElementById('darkBackgroundOpacity').value;
-    const darkOverlayColor = document.getElementById('darkOverlayColor').value;
-    const darkOverlayOpacity = document.getElementById('darkOverlayOpacity').value;
-    const darkInvert = document.querySelector('input[name="darkInvert"]:checked').value;
-    
-    const lightBackgroundImage = this.themeManager.savedLightBackgroundImage || '';
-    const lightBackgroundPositionX = document.getElementById('lightBackgroundPositionX').value;
-    const lightBackgroundPositionY = document.getElementById('lightBackgroundPositionY').value;
-    const lightBackgroundSizeWidth = document.getElementById('lightBackgroundSizeWidth').value;
-    const lightBackgroundOpacity = document.getElementById('lightBackgroundOpacity').value;
-    const lightOverlayColor = document.getElementById('lightOverlayColor').value;
-    const lightOverlayOpacity = document.getElementById('lightOverlayOpacity').value;
-    const lightInvert = document.querySelector('input[name="lightInvert"]:checked').value;
-    
-    try {
-      await ipcRenderer.invoke('save-settings', {
-        theme: themeMode,
-        taskCardOpacity: taskOpacity,
-        expenseCardOpacity: expenseOpacity,
-        financeCardOpacity: financeOpacity,
-        calendarOpacity: calendarOpacity,
-        budgetOpacity: budgetOpacity,
-        secretCardOpacity: secretOpacity,
-        darkBackgroundImage: darkBackgroundImage ? encodeURIComponent(darkBackgroundImage) : '',
-        darkBackgroundPositionX: darkBackgroundPositionX,
-        darkBackgroundPositionY: darkBackgroundPositionY,
-        darkBackgroundSizeWidth: darkBackgroundSizeWidth,
-        darkBackgroundOpacity: darkBackgroundOpacity,
-        darkOverlayColor: darkOverlayColor,
-        darkOverlayOpacity: darkOverlayOpacity,
-        darkInvert: darkInvert,
-        lightBackgroundImage: lightBackgroundImage ? encodeURIComponent(lightBackgroundImage) : '',
-        lightBackgroundPositionX: lightBackgroundPositionX,
-        lightBackgroundPositionY: lightBackgroundPositionY,
-        lightBackgroundSizeWidth: lightBackgroundSizeWidth,
-        lightBackgroundOpacity: lightBackgroundOpacity,
-        lightOverlayColor: lightOverlayColor,
-        lightOverlayOpacity: lightOverlayOpacity,
-        lightInvert: lightInvert
-      });
-    } catch {
-      console.error('保存设置失败');
-    }
-    
-    await this.settingsManager.saveCloudConfigSilently();
-    
-    this.settingsManager.savedTheme = themeMode;
-    this.themeManager.savedTaskOpacity = taskOpacity;
-    this.themeManager.savedExpenseOpacity = expenseOpacity;
-    this.themeManager.savedFinanceOpacity = financeOpacity;
-    this.themeManager.savedCalendarOpacity = calendarOpacity;
-    this.themeManager.savedBudgetOpacity = budgetOpacity;
-    
-    this.themeManager.savedDarkBackgroundImage = darkBackgroundImage;
-    this.themeManager.savedDarkBackgroundPositionX = darkBackgroundPositionX;
-    this.themeManager.savedDarkBackgroundPositionY = darkBackgroundPositionY;
-    this.themeManager.savedDarkBackgroundSizeWidth = darkBackgroundSizeWidth;
-    this.themeManager.savedDarkBackgroundOpacity = darkBackgroundOpacity;
-    this.themeManager.savedDarkOverlayColor = darkOverlayColor;
-    this.themeManager.savedDarkOverlayOpacity = darkOverlayOpacity;
-    this.themeManager.savedDarkInvert = darkInvert;
-    
-    this.themeManager.savedLightBackgroundImage = lightBackgroundImage;
-    this.themeManager.savedLightBackgroundPositionX = lightBackgroundPositionX;
-    this.themeManager.savedLightBackgroundPositionY = lightBackgroundPositionY;
-    this.themeManager.savedLightBackgroundSizeWidth = lightBackgroundSizeWidth;
-    this.themeManager.savedLightBackgroundOpacity = lightBackgroundOpacity;
-    this.themeManager.savedLightOverlayColor = lightOverlayColor;
-    this.themeManager.savedLightOverlayOpacity = lightOverlayOpacity;
-    this.themeManager.savedLightInvert = lightInvert;
-    
-    this.themeManager.applyBackgroundSettings();
-    this.themeManager.applyCardOpacity();
-    
-    const modal = document.getElementById('settingsModal');
-    modal.classList.remove('show');
-    const content = modal.querySelector('.modal-content');
-    content.style.left = '50%';
-    content.style.top = '50%';
-  }
-
-  async saveBackgroundSettings() {
-    try {
-      const themeMode = document.querySelector('input[name="themeMode"]:checked').value;
-      const taskOpacity = document.getElementById('taskCardOpacity').value;
-      const expenseOpacity = document.getElementById('expenseCardOpacity').value;
-      const financeOpacity = document.getElementById('financeCardOpacity').value;
-      const calendarOpacity = document.getElementById('calendarOpacity').value;
-      const budgetOpacity = document.getElementById('budgetOpacity').value;
-      const secretOpacity = document.getElementById('secretCardOpacity').value;
-      
-      const darkBackgroundPositionX = document.getElementById('darkBackgroundPositionX').value;
-      const darkBackgroundPositionY = document.getElementById('darkBackgroundPositionY').value;
-      const darkBackgroundSizeWidth = document.getElementById('darkBackgroundSizeWidth').value;
-      const darkBackgroundOpacity = document.getElementById('darkBackgroundOpacity').value;
-      const darkOverlayColor = document.getElementById('darkOverlayColor').value;
-      const darkOverlayOpacity = document.getElementById('darkOverlayOpacity').value;
-      const darkInvert = document.querySelector('input[name="darkInvert"]:checked').value;
-      
-      const lightBackgroundPositionX = document.getElementById('lightBackgroundPositionX').value;
-      const lightBackgroundPositionY = document.getElementById('lightBackgroundPositionY').value;
-      const lightBackgroundSizeWidth = document.getElementById('lightBackgroundSizeWidth').value;
-      const lightBackgroundOpacity = document.getElementById('lightBackgroundOpacity').value;
-      const lightOverlayColor = document.getElementById('lightOverlayColor').value;
-      const lightOverlayOpacity = document.getElementById('lightOverlayOpacity').value;
-      const lightInvert = document.querySelector('input[name="lightInvert"]:checked').value;
-
-      await ipcRenderer.invoke('save-settings', {
-        theme: themeMode,
-        taskCardOpacity: taskOpacity,
-        expenseCardOpacity: expenseOpacity,
-        financeCardOpacity: financeOpacity,
-        calendarOpacity: calendarOpacity,
-        budgetOpacity: budgetOpacity,
-        secretCardOpacity: secretOpacity,
-        darkBackgroundImage: this.themeManager.savedDarkBackgroundImage ? encodeURIComponent(this.themeManager.savedDarkBackgroundImage) : '',
-        darkBackgroundPositionX: darkBackgroundPositionX,
-        darkBackgroundPositionY: darkBackgroundPositionY,
-        darkBackgroundSizeWidth: darkBackgroundSizeWidth,
-        darkBackgroundOpacity: darkBackgroundOpacity,
-        darkOverlayColor: darkOverlayColor,
-        darkOverlayOpacity: darkOverlayOpacity,
-        darkInvert: darkInvert,
-        lightBackgroundImage: this.themeManager.savedLightBackgroundImage ? encodeURIComponent(this.themeManager.savedLightBackgroundImage) : '',
-        lightBackgroundPositionX: lightBackgroundPositionX,
-        lightBackgroundPositionY: lightBackgroundPositionY,
-        lightBackgroundSizeWidth: lightBackgroundSizeWidth,
-        lightBackgroundOpacity: lightBackgroundOpacity,
-        lightOverlayColor: lightOverlayColor,
-        lightOverlayOpacity: lightOverlayOpacity,
-        lightInvert: lightInvert
-      });
-
-      this.themeManager.savedDarkBackgroundPositionX = darkBackgroundPositionX;
-      this.themeManager.savedDarkBackgroundPositionY = darkBackgroundPositionY;
-      this.themeManager.savedDarkBackgroundSizeWidth = darkBackgroundSizeWidth;
-      this.themeManager.savedDarkBackgroundOpacity = darkBackgroundOpacity;
-      this.themeManager.savedDarkOverlayColor = darkOverlayColor;
-      this.themeManager.savedDarkOverlayOpacity = darkOverlayOpacity;
-      this.themeManager.savedDarkInvert = darkInvert;
-      
-      this.themeManager.savedLightBackgroundPositionX = lightBackgroundPositionX;
-      this.themeManager.savedLightBackgroundPositionY = lightBackgroundPositionY;
-      this.themeManager.savedLightBackgroundSizeWidth = lightBackgroundSizeWidth;
-      this.themeManager.savedLightBackgroundOpacity = lightBackgroundOpacity;
-      this.themeManager.savedLightOverlayColor = lightOverlayColor;
-      this.themeManager.savedLightOverlayOpacity = lightOverlayOpacity;
-      this.themeManager.savedLightInvert = lightInvert;
-    } catch {
-      console.error('保存背景设置失败');
-    }
-  }
-
-  previewThemeChange(isDark) {
-    const root = document.documentElement;
-    const titleEl = document.querySelector('.titlebar-title');
-    const isTest = window.isTestVersion === true;
-    
-    if (isDark) {
-      root.classList.add('dark-mode');
-      if (titleEl) {
-        titleEl.textContent = isTest ? 'Philia Beta' : 'Philia';
-      }
-    } else {
-      root.classList.remove('dark-mode');
-      if (titleEl) {
-        titleEl.textContent = isTest ? 'Elysia Beta' : 'Elysia';
-      }
-    }
-    this.themeManager.applyBackgroundSettings();
-  }
-
-  previewCardOpacity() {
-    const taskOpacity = document.getElementById('taskCardOpacity').value / 100;
-    const expenseOpacity = document.getElementById('expenseCardOpacity').value / 100;
-    const financeOpacity = document.getElementById('financeCardOpacity').value / 100;
-    const calendarOpacity = document.getElementById('calendarOpacity').value / 100;
-    const budgetOpacity = document.getElementById('budgetOpacity').value / 100;
-    const secretOpacity = document.getElementById('secretCardOpacity').value / 100;
-    
-    document.documentElement.style.setProperty('--task-card-opacity', taskOpacity);
-    document.documentElement.style.setProperty('--expense-card-opacity', expenseOpacity);
-    document.documentElement.style.setProperty('--finance-card-opacity', financeOpacity);
-    document.documentElement.style.setProperty('--calendar-opacity', calendarOpacity);
-    document.documentElement.style.setProperty('--budget-opacity', budgetOpacity);
-    document.documentElement.style.setProperty('--secret-card-opacity', secretOpacity);
-    
-    document.querySelectorAll('.task-card, .task-group').forEach(card => {
-      card.style.opacity = taskOpacity;
-    });
-    
-    document.querySelectorAll('.expense-item, .expenses-list .item-card.expense-card').forEach(card => {
-      card.style.opacity = expenseOpacity;
-    });
-    
-    document.querySelectorAll('.statistics-panel').forEach(panel => {
-      panel.style.opacity = financeOpacity;
-    });
-    
-    document.querySelectorAll('.expenses-calendar-section, .calendar-grid, .calendar-weekdays').forEach(calendar => {
-      calendar.style.opacity = calendarOpacity;
-    });
-    
-    document.querySelectorAll('.category-budget-panel, .category-budget-list, .category-budget-item-display').forEach(budget => {
-      budget.style.opacity = budgetOpacity;
-    });
-    
-    document.querySelectorAll('.secret-card').forEach(card => {
-      card.style.opacity = secretOpacity;
-    });
-  }
-
-  saveCardOpacitySettings() {
   }
 
   setupAddButton() {
@@ -7024,14 +6651,19 @@ class AppController {
           <div class="item-card expense-card ${expense.type}" data-id="${expense.id}">
             <div class="expense-icon">${categoryIcon}</div>
             <div class="expense-info">
-              <div class="expense-name">${utils.escapeHtml(expense.detail)}</div>
-              <div class="expense-category">${utils.escapeHtml(expense.category)} <span class="expense-creator-badge">${XilianUI.renderCreatorBadge(expense.creator)}</span></div>
-            </div>
-            <div class="expense-amount">
-              ${expense.type === 'income' ? '+' : '-'}¥${expense.amount.toFixed(2)}
-            </div>
-            <div class="item-actions">
-              <button class="menu-btn" data-id="${expense.id}" data-type="expense">...</button>
+              <div class="expense-name-row">
+                <div class="expense-name">${utils.escapeHtml(expense.detail)}</div>
+                <div class="expense-amount">
+                  ${expense.type === 'income' ? '+' : '-'}¥${expense.amount.toFixed(2)}
+                </div>
+                <div class="item-actions">
+                  <button class="menu-btn" data-id="${expense.id}" data-type="expense">...</button>
+                </div>
+              </div>
+              <div class="expense-category-row">
+                <span class="expense-category">${utils.escapeHtml(expense.category)}</span>
+                <span class="expense-creator-badge">${XilianUI.renderCreatorBadge(expense.creator)}</span>
+              </div>
             </div>
           </div>
         `;
@@ -7622,7 +7254,40 @@ class AppController {
     root.scrollTo({ top: root.scrollTop + (hTop - rootTop) - 10, behavior: 'smooth' });
   }
 
-  initQuillEditor() {
+  /**
+   * 懒加载 Quill（本地 node_modules，避免启动期依赖 CDN 网络）
+   * 首次打开备忘录编辑器时才注入样式与脚本
+   */
+  ensureQuill() {
+    if (window.Quill) return Promise.resolve(window.Quill);
+    if (this._quillPromise) return this._quillPromise;
+    this._quillPromise = new Promise((resolve, reject) => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'node_modules/quill/dist/quill.snow.css';
+      document.head.appendChild(link);
+
+      const script = document.createElement('script');
+      script.src = 'node_modules/quill/dist/quill.js';
+      script.onload = () => resolve(window.Quill);
+      script.onerror = () => {
+        this._quillPromise = null;
+        reject(new Error('Quill 编辑器加载失败'));
+      };
+      document.head.appendChild(script);
+    });
+    return this._quillPromise;
+  }
+
+  async initQuillEditor() {
+    // ★ 懒加载 Quill：确保编辑器脚本就绪后再初始化
+    try {
+      await this.ensureQuill();
+    } catch (e) {
+      console.error('Quill 加载失败，备忘录编辑器不可用:', e);
+      return;
+    }
+
     // ★ 注册 Divider Blot（Quill 1.3.7 官方无 divider，需手动注册 hr 为合法 block embed）
     // 否则直接 DOM 插入 <hr> 会被 quill.update() 当未知节点删除 → 分割线不可见
     if (window.Quill && !window.__dividerBlotRegistered) {

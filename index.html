@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elysia</title>
-    <link rel="stylesheet" href="styles.css?v=2026080303">
-    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=2026080404">
 </head>
 <body>
     <div id="loadingScreen" class="loading-screen" style="display: none;">
@@ -699,10 +697,10 @@
                         <!-- 左侧：头像列表 -->
                         <div class="xilian-header-avatars" id="xilianHeaderAvatars">
                             <div class="xilian-header-agent">
-                                <img id="xilianHeaderAgentAvatar" src="" class="xilian-header-avatar" alt="智能体" style="width:24px;height:24px;border-radius:50%;">
+                                <img id="xilianHeaderAgentAvatar" class="xilian-header-avatar" alt="智能体" style="display:none;width:24px;height:24px;border-radius:50%;">
                             </div>
                             <div class="xilian-header-user-avatar-mini">
-                                <img id="xilianHeaderUserAvatar" src="" class="xilian-header-avatar" alt="用户" style="width:24px;height:24px;border-radius:50%;">
+                                <img id="xilianHeaderUserAvatar" class="xilian-header-avatar" alt="用户" style="display:none;width:24px;height:24px;border-radius:50%;">
                             </div>
                         </div>
                         <!-- 中间：聊天室名字 -->
@@ -723,7 +721,6 @@
                                 </div>
                             </div>
                         </div>
-                        <span class="xilian-notify-dot" id="xilianNotifyDot" style="display:none;"></span>
                     </div>
                     <!-- @提及选择器 -->
                     <div class="xilian-mention-panel" id="xilianMentionPanel" style="display:none;">
@@ -732,8 +729,8 @@
                     <div class="xilian-messages" id="xilianMessages">
                         <div class="xilian-welcome">
                             <div class="xilian-welcome-inner">
-                                <div class="xilian-welcome-icon"><img src="file:///D:/BaiduSyncdisk/Elysia/背景图/昔涟.gif" class="xilian-avatar-img xilian-welcome-avatar" style="width:64px;height:64px;border-radius:50%;" alt="昔涟"></div>
-                                <h3>你好，我是昔涟</h3>
+                                <div class="xilian-welcome-icon"><img id="xilianWelcomeAvatar" class="xilian-avatar-img xilian-welcome-avatar" style="display:none;width:64px;height:64px;border-radius:50%;" alt="智能体"></div>
+                                <h3 id="xilianWelcomeTitle">你好</h3>
                                 <p>我是你的小助理~有什么需要我来做的吗</p>
                                 <div class="xilian-suggestions">
                                     <button class="xilian-suggestion" data-prompt="帮我创建一个明天下午的任务：开会讨论项目进度">📋 创建任务</button>
@@ -1922,10 +1919,10 @@
         </div>
     </div>
     
-    <script src="xilian-ui.js?v=2026080301"></script>
+    <script src="xilian-ui.js?v=2026080401"></script>
     <script src="xilian-settings.js?v=2026073004"></script>
     <script src="chat-room-manager.js?v=2026073004"></script>
-    <script src="xilian-manager.js?v=2026080301"></script>
-    <script src="app.js?v=2026080302"></script>
+    <script src="xilian-manager.js?v=2026080401"></script>
+    <script src="app.js?v=2026080403"></script>
 </body>
 </html>

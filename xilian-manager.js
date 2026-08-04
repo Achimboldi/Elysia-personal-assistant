@@ -935,7 +935,11 @@ class XilianManager {
         this._setStreaming(false);
         XilianUI.showToolStatus(false, '');
 
-        const errMsg = error?.message || '未知错误';
+        let errMsg = error?.message || '未知错误';
+        // ★ 网络类裸错误 → 用户可读文案（fetch failed / DNS / 连接重置等）
+        if (/fetch failed|ENOTFOUND|ENETUNREACH|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|network request failed|UND_ERR_CONNECT_TIMEOUT|Failed to fetch|getaddrinfo/i.test(errMsg)) {
+            errMsg = '网络连接异常，请检查网络或代理设置后重试';
+        }
         const agentName = this._getAgentNameById(this._currentReplyAgentId);
 
         if (this.currentAssistantMsg) {

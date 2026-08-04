@@ -50,11 +50,6 @@ class ReminderUI {
   init() {
     this.bindEvents();
     this.loadList();
-    // 提醒触发 → 昔涟导航红点亮起（由主进程 reminder-fired 广播驱动）
-    ipcRenderer.on('reminder-fired', () => {
-      const d = document.getElementById('xilianNotifyDot');
-      if (d) d.style.display = 'block';
-    });
   }
 
   // ============================================================

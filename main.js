@@ -24,6 +24,15 @@ try {
 let lastBackupTime = 0;
 let lastBackupHash = '';
 
+// ★ 云同步网络错误 → 用户可读文案（瞬时 DNS/连接问题不再显示裸报错）
+function friendlyCloudError(e) {
+  const msg = (e && (e.message || String(e))) || '未知错误';
+  if (/ENOTFOUND|ENETUNREACH|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|fetch failed|socket hang up|getaddrinfo|network request failed/i.test(msg)) {
+    return '网络连接异常，请检查网络或代理设置后重试';
+  }
+  return msg;
+}
+
 // ★ 聊天室合并辅助函数（模块级别，供所有 IPC 处理函数使用）
 function _mergeChatRoomsById(localRooms, cloudRooms) {
   const roomMap = new Map();
@@ -2247,7 +2256,7 @@ function setupIpcHandlers() {
       safeError('同步到云盘失败:', e);
       return {
         success: false,
-        message: '同步失败: ' + e.message
+        message: '同步失败: ' + friendlyCloudError(e)
       };
     }
   });
@@ -2394,7 +2403,7 @@ function setupIpcHandlers() {
       }
     } catch (e) {
       safeError('云端上传失败:', e);
-      return { success: false, message: '云端上传失败: ' + e.message };
+      return { success: false, message: '云端上传失败: ' + friendlyCloudError(e) };
     }
   });
 
@@ -2626,7 +2635,7 @@ function setupIpcHandlers() {
       }
     } catch (e) {
       safeError('云端下载失败:', e);
-      return { success: false, message: '云端下载失败: ' + e.message };
+      return { success: false, message: '云端下载失败: ' + friendlyCloudError(e) };
     }
   });
 
@@ -2806,7 +2815,7 @@ function setupIpcHandlers() {
       } catch(e) { return { success: false, message: e.message }; };
     } catch (e) {
       safeError('自动同步失败:', e);
-      return { success: false, message: '自动同步失败: ' + e.message };
+      return { success: false, message: '自动同步失败: ' + friendlyCloudError(e) };
     }
   });
 
@@ -3470,11 +3479,19 @@ function setupIpcHandlers() {
     const backupPath = path.join(backupDir, backupFileName);
     
     try {
+      // ★ 脱敏：备份中不保留 API Key 等敏感字段（data 深拷贝后擦除）
+      const redactedData = JSON.parse(JSON.stringify(data));
+      if (redactedData && redactedData.settings && typeof redactedData.settings === 'object') {
+        if (redactedData.settings.aiApiKey) redactedData.settings.aiApiKey = '***';
+        if (redactedData.settings.githubToken) redactedData.settings.githubToken = '***';
+        if (redactedData.settings.cloudToken) redactedData.settings.cloudToken = '***';
+        if (redactedData.settings.cloudRefreshToken) redactedData.settings.cloudRefreshToken = '***';
+      }
       const backupData = {
         version: '1.0',
         timestamp: now,
         syncType: syncType,
-        data: data
+        data: redactedData
       };
       
       fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2));

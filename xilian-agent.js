@@ -1004,6 +1004,41 @@ module.exports = {
   invalidateDataContextCache
 };
 
+// ============================================================
+// 网络容错：瞬时 DNS/连接抖动自动重试，错误提示用户可读
+// ============================================================
+
+const NETWORK_ERROR_PATTERNS = /fetch failed|ENOTFOUND|ENETUNREACH|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|network request failed|UND_ERR_CONNECT_TIMEOUT|Failed to fetch|ERR_INTERNET_DISCONNECTED|getaddrinfo/i;
+
+function isNetworkError(err) {
+  return !!(err && (err.name === 'TypeError' || NETWORK_ERROR_PATTERNS.test(String(err && (err.message || err)))));
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * 带重试的 fetch：仅对网络类错误重试（最多 2 次，退避 0.8s / 1.6s），
+ * 业务错误（4xx/5xx）与 AbortError 不重试直接抛出。
+ */
+async function fetchWithRetry(url, options, retries = 2) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      safeLog(`[昔涟] 网络请求失败，${attempt} 秒后重试（第 ${attempt} 次）：${lastErr && lastErr.message}`);
+      await sleep(attempt * 800);
+    }
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      lastErr = err;
+      if (!isNetworkError(err)) throw err;
+    }
+  }
+  throw new Error('网络连接异常，请检查网络或代理设置后重试');
+}
+
 async function callDeepSeekAPI(messages, config, onContent, externalSignal) {
   const apiKey = config.apiKey;
   const baseUrl = config.baseUrl || 'https://api.deepseek.com';
@@ -1031,7 +1066,7 @@ async function callDeepSeekAPI(messages, config, onContent, externalSignal) {
   }
 
   try {
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const response = await fetchWithRetry(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(body),
@@ -1050,6 +1085,7 @@ async function callDeepSeekAPI(messages, config, onContent, externalSignal) {
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') throw new Error('AI 响应超时（2分钟）');
+    if (isNetworkError(error)) throw new Error('网络连接异常，请检查网络或代理设置后重试');
     throw error;
   }
 }
@@ -1074,7 +1110,7 @@ async function callDeepSeekAPINonStream(messages, config, externalSignal) {
   }
 
   try {
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const response = await fetchWithRetry(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
@@ -1109,6 +1145,7 @@ async function callDeepSeekAPINonStream(messages, config, externalSignal) {
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') throw new Error('AI 响应超时（2分钟）');
+    if (isNetworkError(error)) throw new Error('网络连接异常，请检查网络或代理设置后重试');
     throw error;
   }
 }
