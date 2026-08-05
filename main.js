@@ -208,6 +208,59 @@ function mergePresetLists(cloudPresets, localPresets) {
     return result;
 }
 
+// ★ 提醒合并：按 id 去重，updatedAt 较新者胜；双方独有都保留（与 aiPresets 同策略）
+// 防止云端旧 settings.reminders 覆盖本地新建的提醒导致丢失
+// （必须定义在模块顶层：cloud-sync-download 等 handler 均会调用）
+function mergeReminderLists(cloudReminders, localReminders) {
+  const toList = (arr) => Array.isArray(arr) ? arr : [];
+  const map = new Map();
+  for (const r of toList(localReminders)) {
+    if (r && r.id) map.set(String(r.id), r);
+  }
+  for (const r of toList(cloudReminders)) {
+    if (!r || !r.id) continue;
+    const id = String(r.id);
+    const local = map.get(id);
+    if (!local) { map.set(id, r); continue; }
+    const lt = new Date(local.updatedAt || local.createdAt || 0).getTime();
+    const ct = new Date(r.updatedAt || r.createdAt || 0).getTime();
+    if (!isNaN(lt) && !isNaN(ct) && ct >= lt) map.set(id, r);
+  }
+  return [...map.values()];
+}
+
+function mergeSettings(localSettings, cloudSettings) {
+  return {
+    ...cloudSettings,
+    cloudAppId: localSettings.cloudAppId || '',
+    cloudAppKey: localSettings.cloudAppKey || '',
+    cloudAppSecret: localSettings.cloudAppSecret || '',
+    cloudToken: localSettings.cloudToken || '',
+    cloudRefreshToken: localSettings.cloudRefreshToken || '',
+    cloudTokenExpireTime: localSettings.cloudTokenExpireTime || 0,
+    backgroundImage: localSettings.backgroundImage || '',
+    themeMode: localSettings.themeMode || '',
+    cardOpacity: localSettings.cardOpacity || '',
+    fontSize: localSettings.fontSize || '',
+    darkBackground: localSettings.darkBackground || '',
+    lightBackground: localSettings.lightBackground || '',
+    autoSyncEnabled: localSettings.autoSyncEnabled || false,
+    autoSyncInterval: localSettings.autoSyncInterval || 10,
+    cloudCurrentUserId: localSettings.cloudCurrentUserId || 'admin',
+    // 智能体数据：本地优先，防止云端空数据覆盖
+    aiPresets: mergePresetLists(cloudSettings?.aiPresets || [], localSettings?.aiPresets || []),
+    reminders: mergeReminderLists(cloudSettings?.reminders || [], localSettings?.reminders || []),
+    aiCurrentPresetId: localSettings.aiCurrentPresetId || cloudSettings.aiCurrentPresetId || '',
+    aiApiKey: localSettings.aiApiKey || cloudSettings.aiApiKey || '',
+    aiModel: localSettings.aiModel || cloudSettings.aiModel || 'deepseek-v4-flash',
+    aiAgentName: localSettings.aiAgentName || cloudSettings.aiAgentName || '',
+    aiSystemPrompt: localSettings.aiSystemPrompt || cloudSettings.aiSystemPrompt || '',
+    // ★ 头像：云端优先（base64 data URL），头像为共享身份应跨设备一致；云端为空时保留本地，避免"变回默认"
+    aiUserAvatar: cloudSettings.aiUserAvatar || localSettings.aiUserAvatar || '',
+    aiAgentAvatar: cloudSettings.aiAgentAvatar || localSettings.aiAgentAvatar || ''
+  };
+}
+
 // 双版本管理配置
 async function setCurrentVersion(version) {
   const currentData = readData();
@@ -3386,58 +3439,6 @@ function setupIpcHandlers() {
     return merged;
   }
   
-  // ★ 提醒合并：按 id 去重，updatedAt 较新者胜；双方独有都保留（与 aiPresets 同策略）
-  // 防止云端旧 settings.reminders 覆盖本地新建的提醒导致丢失
-  function mergeReminderLists(cloudReminders, localReminders) {
-    const toList = (arr) => Array.isArray(arr) ? arr : [];
-    const map = new Map();
-    for (const r of toList(localReminders)) {
-      if (r && r.id) map.set(String(r.id), r);
-    }
-    for (const r of toList(cloudReminders)) {
-      if (!r || !r.id) continue;
-      const id = String(r.id);
-      const local = map.get(id);
-      if (!local) { map.set(id, r); continue; }
-      const lt = new Date(local.updatedAt || local.createdAt || 0).getTime();
-      const ct = new Date(r.updatedAt || r.createdAt || 0).getTime();
-      if (!isNaN(lt) && !isNaN(ct) && ct >= lt) map.set(id, r);
-    }
-    return [...map.values()];
-  }
-
-  function mergeSettings(localSettings, cloudSettings) {
-    return {
-      ...cloudSettings,
-      cloudAppId: localSettings.cloudAppId || '',
-      cloudAppKey: localSettings.cloudAppKey || '',
-      cloudAppSecret: localSettings.cloudAppSecret || '',
-      cloudToken: localSettings.cloudToken || '',
-      cloudRefreshToken: localSettings.cloudRefreshToken || '',
-      cloudTokenExpireTime: localSettings.cloudTokenExpireTime || 0,
-      backgroundImage: localSettings.backgroundImage || '',
-      themeMode: localSettings.themeMode || '',
-      cardOpacity: localSettings.cardOpacity || '',
-      fontSize: localSettings.fontSize || '',
-      darkBackground: localSettings.darkBackground || '',
-      lightBackground: localSettings.lightBackground || '',
-      autoSyncEnabled: localSettings.autoSyncEnabled || false,
-      autoSyncInterval: localSettings.autoSyncInterval || 10,
-      cloudCurrentUserId: localSettings.cloudCurrentUserId || 'admin',
-      // 智能体数据：本地优先，防止云端空数据覆盖
-      aiPresets: mergePresetLists(cloudSettings?.aiPresets || [], localSettings?.aiPresets || []),
-      reminders: mergeReminderLists(cloudSettings?.reminders || [], localSettings?.reminders || []),
-      aiCurrentPresetId: localSettings.aiCurrentPresetId || cloudSettings.aiCurrentPresetId || '',
-      aiApiKey: localSettings.aiApiKey || cloudSettings.aiApiKey || '',
-      aiModel: localSettings.aiModel || cloudSettings.aiModel || 'deepseek-v4-flash',
-      aiAgentName: localSettings.aiAgentName || cloudSettings.aiAgentName || '',
-      aiSystemPrompt: localSettings.aiSystemPrompt || cloudSettings.aiSystemPrompt || '',
-      // ★ 头像：云端优先（base64 data URL），头像为共享身份应跨设备一致；云端为空时保留本地，避免"变回默认"
-      aiUserAvatar: cloudSettings.aiUserAvatar || localSettings.aiUserAvatar || '',
-      aiAgentAvatar: cloudSettings.aiAgentAvatar || localSettings.aiAgentAvatar || ''
-    };
-  }
-
   async function backupDataVersion(data, syncType) {
     const now = Date.now();
     
