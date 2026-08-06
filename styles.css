@@ -4997,6 +4997,11 @@ body {
   flex-shrink: 0;
 }
 
+/* ★ 收支卡片：…按钮上移，与金额行视觉对齐更舒适 */
+.item-card.expense-card .item-actions {
+  transform: translateY(-4px);
+}
+
 /* Task Card (Grid) */
 .task-card {
   background: rgba(255, 255, 255, 0.9);
