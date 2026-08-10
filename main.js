@@ -491,11 +491,24 @@ function createMainWindow() {
   });
 }
 
+// ★ Linux 上 nativeImage 无法解码 .ico（托盘图标会变空），优先使用 PNG
+function getIconPath() {
+  const fs = require('fs');
+  const pngPath = path.join(process.resourcesPath, 'Elysia.png');
+  if (fs.existsSync(pngPath)) {
+    return pngPath;
+  }
+  const icoPath = path.join(process.resourcesPath, 'Elysia.ico');
+  if (fs.existsSync(icoPath)) {
+    return icoPath;
+  }
+  return null;
+}
+
 function getAppIcon() {
   try {
-    const fs = require('fs');
-    const iconPath = path.join(process.resourcesPath, 'Elysia.ico');
-    if (fs.existsSync(iconPath)) {
+    const iconPath = getIconPath();
+    if (iconPath) {
       let icon = nativeImage.createFromPath(iconPath);
       if (IS_TEST_VERSION && icon && !icon.isEmpty()) {
         icon = grayscaleImage(icon);
@@ -554,9 +567,8 @@ function cleanupResources() {
 function createTray() {
   let icon;
   try {
-    const fs = require('fs');
-    const iconPath = path.join(process.resourcesPath, 'Elysia.ico');
-    if (fs.existsSync(iconPath)) {
+    const iconPath = getIconPath();
+    if (iconPath) {
       icon = nativeImage.createFromPath(iconPath);
     }
   } catch (e) {
