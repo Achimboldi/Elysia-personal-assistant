@@ -5276,6 +5276,30 @@ if (!fs.existsSync(customUserDataPath)) {
 
 app.setPath('userData', customUserDataPath);
 
+// ★ 启动时自动备份数据文件（防外部删除/覆盖导致的数据丢失）
+function backupDataOnStartup() {
+  try {
+    const dataPath = path.join(exePath, 'data.json');
+    if (!fs.existsSync(dataPath)) return;
+    const stats = fs.statSync(dataPath);
+    const backupDir = path.join(customUserDataPath, 'backups');
+    const today = new Date().toISOString().slice(0, 10);
+    const backupPath = path.join(backupDir, `data-${today}.json`);
+    if (fs.existsSync(backupPath)) {
+      const backupStats = fs.statSync(backupPath);
+      // 同一天已有备份且比当前数据新，则跳过（避免用旧数据覆盖当日备份）
+      if (backupStats.mtimeMs >= stats.mtimeMs) return;
+    }
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    fs.copyFileSync(dataPath, backupPath);
+    safeLog('[启动] 数据备份完成: ' + backupPath);
+  } catch (e) {
+    safeError('数据备份失败:', e);
+  }
+}
+
 let cleanupEmptyDirsInterval;
 
 async function scheduleEmptyDirCleanup() {
@@ -5354,6 +5378,7 @@ if (!gotSingleInstanceLock) {
 app.whenReady().then(() => {
   // ★ 性能：先创建窗口/托盘，让应用尽快进入可交互状态；
   //   数据清理（去重/跨用户过滤）不依赖窗口，移到其后执行
+  backupDataOnStartup();
   createMainWindow();
   createTray();
   setupGlobalHotkeys();
