@@ -4299,7 +4299,7 @@ ipcMain.handle('cloud-sync-check', async () => {
       height: 400,
       frame: false,
       resizable: true,
-      alwaysOnTop: true,
+      alwaysOnTop: false,
       skipTaskbar: false,
       icon: getAppIcon(),
       minWidth: 80,
