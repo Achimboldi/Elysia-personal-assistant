@@ -683,3 +683,26 @@ body {
 
 /* 折叠态顶部：目录按钮靠左，其余按钮靠右 */
 .sticky-nav-toggle { margin-right: auto; }
+
+/* ★ Linux 兜底：右下角 resize 手柄（Wayland frameless 窗口边缘 resize 失效时手动调大小） */
+.sticky-resize-handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    cursor: nwse-resize;
+    z-index: 40;
+    -webkit-app-region: no-drag;
+    user-select: none;
+}
+.sticky-resize-handle::after {
+    content: '';
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid rgba(0, 0, 0, 0.35);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.35);
+}

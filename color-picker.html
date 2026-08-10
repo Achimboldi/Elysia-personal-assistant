@@ -69,6 +69,12 @@
         let magnifierCtx = magnifierCanvas.getContext('2d');
 
         ipcRenderer.on('init-picker', (event, data) => {
+            if (!data || !data.dataUrl) {
+                document.body.style.background = '#222';
+                colorPreview.textContent = '截图失败，无法取色';
+                colorPreview.style.background = '#c0392b';
+                return;
+            }
             screenImage = new Image();
             screenImage.onload = () => {
                 document.body.style.backgroundImage = `url(${data.dataUrl})`;

@@ -4299,7 +4299,7 @@ ipcMain.handle('cloud-sync-check', async () => {
       height: 400,
       frame: false,
       resizable: true,
-      alwaysOnTop: false,
+      alwaysOnTop: true,
       skipTaskbar: false,
       icon: getAppIcon(),
       minWidth: 80,
@@ -4308,7 +4308,6 @@ ipcMain.handle('cloud-sync-check', async () => {
       titleBarStyle: 'hidden',
       visualEffectState: 'disabled',
       hasShadow: false,
-      transparent: true,
       show: false,  // ★ 修复：先隐藏窗口，等内容渲染完成后再显示，避免透明窗口"消失"
       webPreferences: {
         nodeIntegration: true,
@@ -4351,6 +4350,15 @@ ipcMain.handle('cloud-sync-check', async () => {
     const focusedWindow = BrowserWindow.getFocusedWindow();
     if (focusedWindow) {
       focusedWindow.setAlwaysOnTop(isPinned);
+    }
+  });
+
+  ipcMain.handle('resize-sticky-note', (event, width, height) => {
+    const sticky = stickyNoteWindows.find(s => s.window && !s.window.isDestroyed() && s.window.webContents === event.sender);
+    const win = (sticky && sticky.window) || BrowserWindow.getFocusedWindow();
+    if (win && !win.isDestroyed()) {
+      const [curW, curH] = win.getSize();
+      win.setSize(Math.max(80, Math.round(width)), Math.max(40, Math.round(height)));
     }
   });
 
@@ -5231,7 +5239,7 @@ function openColorPicker(memoId) {
     return;
   }
 
-  const { desktopCapturer, screen } = require('electron');
+  const { screen } = require('electron');
   const displays = screen.getAllDisplays();
   const primaryDisplay = displays[0];
   
@@ -5263,20 +5271,55 @@ function openColorPicker(memoId) {
   });
 
   // 捕获屏幕截图
-  desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: {
-      width: primaryDisplay.bounds.width,
-      height: primaryDisplay.bounds.height
-    }
-  }).then(sources => {
-    if (sources.length > 0 && colorPickerWindow && !colorPickerWindow.isDestroyed()) {
-      const dataUrl = sources[0].thumbnail.toDataURL();
+  // ★ Linux/Wayland 修复：desktopCapturer 在 Wayland 下无法截屏（返回黑图），
+  //   改用系统原生截图工具 grim（niri/wlroots 支持）；失败时回退 desktopCapturer。
+  captureScreenForPicker(primaryDisplay).then(dataUrl => {
+    if (dataUrl && colorPickerWindow && !colorPickerWindow.isDestroyed()) {
       colorPickerWindow.webContents.send('init-picker', { dataUrl: dataUrl });
+    } else if (colorPickerWindow && !colorPickerWindow.isDestroyed()) {
+      colorPickerWindow.webContents.send('init-picker', { dataUrl: null, error: '截图失败' });
     }
-  }).catch(err => {
-    safeError('捕获屏幕失败:', err);
   });
+}
+
+// 取色截屏：优先 grim（Wayland 原生），回退 desktopCapturer（X11/Windows）
+async function captureScreenForPicker(primaryDisplay) {
+  if (process.platform === 'linux' && process.env.WAYLAND_DISPLAY) {
+    try {
+      const { execFile } = require('child_process');
+      const tmpFile = path.join(app.getPath('temp'), `elysia-picker-${Date.now()}.png`);
+      await new Promise((resolve, reject) => {
+        execFile('grim', [tmpFile], { timeout: 8000 }, (err) => {
+          if (err) reject(err); else resolve();
+        });
+      });
+      const buf = fs.readFileSync(tmpFile);
+      try { fs.unlinkSync(tmpFile); } catch (_) {}
+      const { nativeImage } = require('electron');
+      const img = nativeImage.createFromBuffer(buf);
+      if (!img.isEmpty()) {
+        return img.toDataURL();
+      }
+    } catch (e) {
+      safeLog('[取色] grim 截图失败，回退 desktopCapturer: ' + e.message);
+    }
+  }
+  try {
+    const { desktopCapturer } = require('electron');
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: primaryDisplay.bounds.width,
+        height: primaryDisplay.bounds.height
+      }
+    });
+    if (sources.length > 0 && !sources[0].thumbnail.isEmpty()) {
+      return sources[0].thumbnail.toDataURL();
+    }
+  } catch (e) {
+    safeLog('[取色] desktopCapturer 截图失败: ' + e.message);
+  }
+  return null;
 }
 
 const exePath = path.dirname(app.getPath('exe'));

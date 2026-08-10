@@ -864,4 +864,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const wrapper = document.getElementById('stickyWrapper');
         if (wrapper) wrapper.classList.remove('nav-open');
     });
+
+    // ★ Linux 兜底：右下角 resize 手柄，拖动调整窗口大小
+    const resizeHandle = document.getElementById('stickyResizeHandle');
+    if (resizeHandle) {
+        let resizing = false;
+        let startX = 0, startY = 0, startW = 0, startH = 0;
+        resizeHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            resizing = true;
+            startX = e.screenX;
+            startY = e.screenY;
+            startW = window.outerWidth || document.documentElement.clientWidth;
+            startH = window.outerHeight || document.documentElement.clientHeight;
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', onResizeMove);
+            document.addEventListener('mouseup', onResizeUp);
+        });
+        function onResizeMove(e) {
+            if (!resizing) return;
+            const nw = startW + (e.screenX - startX);
+            const nh = startH + (e.screenY - startY);
+            ipcRenderer.invoke('resize-sticky-note', nw, nh);
+        }
+        function onResizeUp() {
+            resizing = false;
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onResizeMove);
+            document.removeEventListener('mouseup', onResizeUp);
+        }
+    }
 });
