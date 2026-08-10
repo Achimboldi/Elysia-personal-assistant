@@ -48,6 +48,10 @@ class DataManager {
     }
 
     const appPath = app.getAppPath();
+    // 打包后 app.getAppPath() 指向只读的 app.asar，不可写，回退到 exe 同级目录
+    if (path.basename(appPath).endsWith('.asar')) {
+      return exeDataPath;
+    }
     return path.join(appPath, 'data.json');
   }
 

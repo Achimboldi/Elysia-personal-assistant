@@ -27,3 +27,6 @@ Desktop.ini
 # 开源项目通常保留 package-lock.json 以保证可重现；
 # 若你不想入库，取消下面这行注释即可。
 # package-lock.json
+
+# ── Linux 打包产物 ──
+xushi/

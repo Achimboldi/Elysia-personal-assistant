@@ -293,6 +293,20 @@ function getCloudSyncPath() {
   return path.dirname(path.dirname(app.getPath('exe')));
 }
 
+// 云同步镜像目录名：优先沿用 Windows 的 win-unpacked（跨平台兼容），否则用当前平台的打包目录名
+function getCloudAppDirName() {
+  const cloudSyncPath = getCloudSyncPath();
+  const winDir = path.join(cloudSyncPath, 'win-unpacked');
+  if (fs.existsSync(winDir)) {
+    return 'win-unpacked';
+  }
+  const linuxDir = path.join(cloudSyncPath, 'linux-unpacked');
+  if (fs.existsSync(linuxDir)) {
+    return 'linux-unpacked';
+  }
+  return 'win-unpacked';
+}
+
 // 云同步实例
 let cloudSync = null;
 
@@ -373,7 +387,7 @@ function syncDataToCloud() {
   try {
     const currentDataPath = getDataFilePath();
     const cloudSyncPath = getCloudSyncPath();
-    const cloudDataPath = path.join(cloudSyncPath, 'win-unpacked', 'data.json');
+    const cloudDataPath = path.join(cloudSyncPath, getCloudAppDirName(), 'data.json');
     
     if (fs.existsSync(currentDataPath)) {
       fs.copyFileSync(currentDataPath, cloudDataPath);
@@ -392,7 +406,7 @@ function syncMCDbToCloud() {
     const cloudSyncPath = getCloudSyncPath();
     if (!cloudSyncPath) return false;
     const mcDbPath = process.env.MC_DB_PATH || path.join(app.getPath('userData'), 'sanctuary.db');
-    const cloudDbPath = path.join(cloudSyncPath, 'win-unpacked', 'sanctuary.db');
+    const cloudDbPath = path.join(cloudSyncPath, getCloudAppDirName(), 'sanctuary.db');
     if (fs.existsSync(mcDbPath)) {
       // WAL 模式下 copyFileSync 对 SQLite 安全（快照副本）
       fs.copyFileSync(mcDbPath, cloudDbPath);
@@ -410,7 +424,7 @@ function restoreMCDbFromCloud() {
   try {
     const cloudSyncPath = getCloudSyncPath();
     if (!cloudSyncPath) return false;
-    const cloudDbPath = path.join(cloudSyncPath, 'win-unpacked', 'sanctuary.db');
+    const cloudDbPath = path.join(cloudSyncPath, getCloudAppDirName(), 'sanctuary.db');
     if (!fs.existsSync(cloudDbPath)) return false;
     const mcDbPath = process.env.MC_DB_PATH || path.join(app.getPath('userData'), 'sanctuary.db');
     // 如果云端的比本地新，才恢复
@@ -1477,7 +1491,7 @@ function setupIpcHandlers() {
       let sourcePath = updateSourcePath;
       if (!sourcePath) {
         const settings = readData().settings || {};
-        sourcePath = settings.updateSourcePath || path.join(getCloudSyncPath(), 'Elysia', 'win-unpacked', 'resources', 'app');
+        sourcePath = settings.updateSourcePath || path.join(getCloudSyncPath(), 'Elysia', getCloudAppDirName(), 'resources', 'app');
       }
       
       if (!fs.existsSync(sourcePath)) {

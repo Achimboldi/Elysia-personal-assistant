@@ -268,7 +268,7 @@ class UpdateManager {
               message:
                 '⚠️ 远程有 ' + remoteAhead + ' 个新提交，但 rebase 时出现冲突。\n' +
                 '请手动处理冲突后重试：\n' +
-                '  cd D:\\妙妙小工具\\Elysia\\win-unpacked\\resources\\app\n' +
+                '  cd ' + dir + '\n' +
                 '  git status   # 查看冲突文件\n' +
                 '  git rebase --abort   # 取消 rebase\n' +
                 '  或解决冲突后 git rebase --continue\n\n' +

@@ -9,7 +9,8 @@
     "start": "electron .",
     "build": "electron-builder --dir",
     "build:dir": "electron-builder --dir",
-    "build:portable": "electron-builder --win portable"
+    "build:portable": "electron-builder --win portable",
+    "build:linux": "electron-builder --linux"
   },
   "build": {
     "directories": {
@@ -27,6 +28,10 @@
       {
         "from": "Elysia.ico",
         "to": "Elysia.ico"
+      },
+      {
+        "from": "Elysia.png",
+        "to": "Elysia.png"
       }
     ],
     "asar": true,
@@ -40,6 +45,20 @@
         }
       ],
       "icon": ".icon-ico/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
+        "AppImage"
+      ],
+      "icon": "Elysia.png",
+      "category": "Utility",
+      "maintainer": "achimboldi"
     },
     "portable": {
       "artifactName": "Elysia-portable.exe"
@@ -66,5 +85,10 @@
     "rcedit": "^5.0.2",
     "resedit": "^3.0.2",
     "sharp": "^0.34.5"
+  },
+  "allowScripts": {
+    "electron": true,
+    "better-sqlite3@11.10.0": true,
+    "sharp@0.34.5": true
   }
 }
