@@ -34,7 +34,7 @@
         "to": "Elysia.png"
       }
     ],
-    "asar": true,
+    "asar": false,
     "win": {
       "target": [
         {
