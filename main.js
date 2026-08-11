@@ -3371,7 +3371,45 @@ function setupIpcHandlers() {
       }
     }
 
+    // ★ 预算周期去重：同一日期范围（startDate+endDate）只保留时间最新的一个。
+    //   云同步只按 id 区分，若本地/云端各有一个同日期范围的周期（不同 id），
+    //   会导致预算周期重复累积。这里按日期范围合并，保留 updatedAt 最新的。
+    if (type === 'budget') {
+      merged = _deduplicateBudgetsByDateRange(merged);
+    }
+
     return merged;
+  }
+
+  function _deduplicateBudgetsByDateRange(items) {
+    const byRange = new Map();
+    const result = [];
+    for (const item of items) {
+      const start = item.startDate ? String(item.startDate).slice(0, 10) : '';
+      const end = item.endDate ? String(item.endDate).slice(0, 10) : '';
+      if (!start || !end) {
+        result.push(item);
+        continue;
+      }
+      const key = `${start}|${end}`;
+      const existing = byRange.get(key);
+      if (!existing) {
+        byRange.set(key, item);
+        result.push(item);
+      } else {
+        const existingTime = _getItemLastModifiedTime(existing);
+        const itemTime = _getItemLastModifiedTime(item);
+        if (itemTime > existingTime) {
+          byRange.set(key, item);
+          const idx = result.indexOf(existing);
+          if (idx !== -1) result[idx] = item;
+          safeLog(`[合并][budget] 日期范围 ${key} 重复，保留较新的 ID ${item.id || ''}（删除 ${existing.id || ''}）`);
+        } else {
+          safeLog(`[合并][budget] 日期范围 ${key} 重复，保留较新的 ID ${existing.id || ''}（删除 ${item.id || ''}）`);
+        }
+      }
+    }
+    return result;
   }
 
   function mergeItems(localItems, cloudItems) {
