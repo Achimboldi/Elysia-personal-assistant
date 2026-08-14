@@ -246,6 +246,11 @@ function mergeSettings(localSettings, cloudSettings) {
     lightBackground: localSettings.lightBackground || '',
     autoSyncEnabled: localSettings.autoSyncEnabled || false,
     autoSyncInterval: localSettings.autoSyncInterval || 10,
+    // ★ 修复：cloudAutoSync/cloudSyncInterval 是界面自动同步的权威字段，
+    //   云同步合并时若不保留 local 值会被云端空值覆盖，导致用户勾选的
+    //   "自动同步"在重启后被重置（autoSyncEnabled 保真但 cloudAutoSync 丢失）。
+    cloudAutoSync: localSettings.cloudAutoSync !== undefined ? localSettings.cloudAutoSync : cloudSettings.cloudAutoSync || false,
+    cloudSyncInterval: localSettings.cloudSyncInterval !== undefined ? localSettings.cloudSyncInterval : (cloudSettings.cloudSyncInterval || 30),
     cloudCurrentUserId: localSettings.cloudCurrentUserId || 'admin',
     // 智能体数据：本地优先，防止云端空数据覆盖
     aiPresets: mergePresetLists(cloudSettings?.aiPresets || [], localSettings?.aiPresets || []),

@@ -1,5 +1,29 @@
 const { ipcRenderer } = require('electron');
 
+// ★ Linux 适配：把 Windows 盘符路径（如 D:/妙妙小工具/...）映射到 Linux 实际挂载路径
+//   （D: 盘在此机器上挂载于 /mnt/data，即 D:/X → /mnt/data/X）
+//   云同步可能把 Windows 端保存的背景图路径带到 Linux，需转换后才能加载。
+function normalizeBgPath(p) {
+  if (!p) return '';
+  // 已经存在则直接用
+  const fs = require('fs');
+  try {
+    if (fs.existsSync(p)) return p;
+  } catch (_) {}
+  if (process.platform === 'linux') {
+    // Windows 路径: D:/foo → /mnt/data/foo ；D:\foo → /mnt/data/foo
+    const m = /^([A-Za-z]):[/\\]/.exec(p);
+    if (m) {
+      const rest = p.slice(2).replace(/\\/g, '/');
+      const linuxPath = '/mnt/data' + rest;
+      try {
+        if (fs.existsSync(linuxPath)) return linuxPath;
+      } catch (_) {}
+    }
+  }
+  return p;
+}
+
 class ThemeManager {
   constructor(appController) {
     this.appController = appController;
@@ -90,7 +114,7 @@ class ThemeManager {
       this.savedReminderOpacity = settings.reminderCardOpacity || '80';
       this.savedMemoOpacity = settings.memoCardOpacity || '80';
       
-      this.savedDarkBackgroundImage = settings.darkBackgroundImage ? decodeURIComponent(settings.darkBackgroundImage) : '';
+      this.savedDarkBackgroundImage = settings.darkBackgroundImage ? normalizeBgPath(decodeURIComponent(settings.darkBackgroundImage)) : '';
       this.savedDarkBackgroundPositionX = settings.darkBackgroundPositionX !== undefined ? settings.darkBackgroundPositionX : '50';
       this.savedDarkBackgroundPositionY = settings.darkBackgroundPositionY !== undefined ? settings.darkBackgroundPositionY : '100';
       this.savedDarkBackgroundSizeWidth = settings.darkBackgroundSizeWidth !== undefined ? settings.darkBackgroundSizeWidth : '70';
@@ -99,7 +123,7 @@ class ThemeManager {
       this.savedDarkOverlayOpacity = settings.darkOverlayOpacity || '0';
       this.savedDarkInvert = settings.darkInvert !== undefined ? settings.darkInvert : 'invert';
       
-      this.savedLightBackgroundImage = settings.lightBackgroundImage ? decodeURIComponent(settings.lightBackgroundImage) : '';
+      this.savedLightBackgroundImage = settings.lightBackgroundImage ? normalizeBgPath(decodeURIComponent(settings.lightBackgroundImage)) : '';
       this.savedLightBackgroundPositionX = settings.lightBackgroundPositionX !== undefined ? settings.lightBackgroundPositionX : '50';
       this.savedLightBackgroundPositionY = settings.lightBackgroundPositionY !== undefined ? settings.lightBackgroundPositionY : '100';
       this.savedLightBackgroundSizeWidth = settings.lightBackgroundSizeWidth !== undefined ? settings.lightBackgroundSizeWidth : '70';
@@ -108,7 +132,7 @@ class ThemeManager {
       this.savedLightOverlayOpacity = settings.lightOverlayOpacity || '0';
       this.savedLightInvert = settings.lightInvert !== undefined ? settings.lightInvert : 'none';
 
-      this.savedChatBackgroundImage = settings.chatBackgroundImage ? decodeURIComponent(settings.chatBackgroundImage) : '';
+      this.savedChatBackgroundImage = settings.chatBackgroundImage ? normalizeBgPath(decodeURIComponent(settings.chatBackgroundImage)) : '';
       this.savedChatBackgroundPositionX = settings.chatBackgroundPositionX !== undefined ? settings.chatBackgroundPositionX : '50';
       this.savedChatBackgroundPositionY = settings.chatBackgroundPositionY !== undefined ? settings.chatBackgroundPositionY : '100';
       this.savedChatBackgroundSizeWidth = settings.chatBackgroundSizeWidth !== undefined ? settings.chatBackgroundSizeWidth : '70';
