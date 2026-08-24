@@ -229,6 +229,21 @@ function mergeReminderLists(cloudReminders, localReminders) {
   return [...map.values()];
 }
 
+/**
+ * 提醒墓碑过滤：从提醒列表剔除已被双端任一删除（墓碑）的 id。
+ * @param {Array} reminders 合并后的提醒列表
+ * @param {object} localDeleted 本地 deletedItems
+ * @param {object} cloudDeleted 云端 deletedItems
+ * @returns {Array}
+ */
+function filterRemindersByTombstone(reminders, localDeleted, cloudDeleted) {
+  const set = new Set();
+  (localDeleted?.reminders || []).forEach(id => set.add(String(id)));
+  (cloudDeleted?.reminders || []).forEach(id => set.add(String(id)));
+  if (set.size === 0) return reminders || [];
+  return (reminders || []).filter(r => r && !set.has(String(r.id)));
+}
+
 function mergeSettings(localSettings, cloudSettings) {
   return {
     ...cloudSettings,
@@ -2539,6 +2554,13 @@ function setupIpcHandlers() {
           lastUpdated: cloudLastUpdated || new Date().toISOString()
         };
         
+        // ★ 提醒墓碑过滤：双端去世的提醒 id 从合并结果中剔除，防止已删除的提醒复活
+        mergedSettings.reminders = filterRemindersByTombstone(
+          mergedSettings.reminders || [],
+          localData.deletedItems || {},
+          cloudData.deletedItems || {}
+        );
+        
         // 诊断日志：确认预设数据来源
         const cloudPresetsLen = (cloudData.settings?.aiPresets || []).length;
         const localPresetsLen = (localData.settings?.aiPresets || []).length;
@@ -2760,6 +2782,18 @@ function setupIpcHandlers() {
         delete mergedData.chatHistoryStore[key];
       }
     }
+
+    // ★ 提醒墓碑：reminders 存于 settings.reminders（非顶层集合），需单独按墓碑过滤，
+    //   防止云端残留的已删除提醒在合并时被拉回复活
+    const reminderSet = new Set();
+    (localDeleted.reminders || []).forEach(id => reminderSet.add(String(id)));
+    (cloudDeleted.reminders || []).forEach(id => reminderSet.add(String(id)));
+    if (mergedData.settings && Array.isArray(mergedData.settings.reminders)) {
+      mergedData.settings.reminders = mergedData.settings.reminders.filter(
+        r => r && !reminderSet.has(String(r.id))
+      );
+    }
+    combined.reminders = Array.from(reminderSet);
 
     mergedData.deletedItems = combined;
     return mergedData;

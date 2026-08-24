@@ -318,17 +318,19 @@ function listReminders() {
  * 持久化 reminders（settings 合并路径，不丢其它 settings 字段）
  * @param {Array} reminders
  * @param {boolean} [updateDataModified]
+ * @param {object} [deletedItemsOverride] 可选：墓碑集合覆盖（deleteReminder 写墓碑时传入）
  * @returns {Promise<Object>} writeData 返回
  */
-async function persistReminders(reminders, updateDataModified = false) {
+async function persistReminders(reminders, updateDataModified = false, deletedItemsOverride) {
   const data = readData();
   const settings = { ...(data.settings || {}), reminders };
+  const deletedItems = deletedItemsOverride !== undefined ? deletedItemsOverride : data.deletedItems;
   const writeResult = await writeData(
     data.tasks, data.memos, data.expenses, data.budgets,
     settings, data.translationStats, data.categoryBudgets || [],
     data.secrets || [], data.journals || [],
     updateDataModified, data.chatHistory, data.chatRooms, data.chatHistoryStore,
-    data.chatHistoryLimit, data.deletedItems
+    data.chatHistoryLimit, deletedItems
   );
   return writeResult;
 }
@@ -417,11 +419,18 @@ async function saveReminder(reminder, options = {}) {
  * @returns {Promise<{success:boolean, message:string}>}
  */
 async function deleteReminder(id) {
-  const reminders = listReminders();
+  const data = readData();
+  const reminders = Array.isArray(data.settings?.reminders) ? data.settings.reminders : listReminders();
   const idx = reminders.findIndex(r => String(r.id) === String(id));
   if (idx === -1) return { success: false, message: '提醒不存在' };
   reminders.splice(idx, 1);
-  const wr = await persistReminders(reminders);
+  // ★ 墓碑：记录已删除的提醒 id，防止云同步把云端残留的提醒拉回复活
+  const deletedItems = { ...(data.deletedItems || {}) };
+  deletedItems.reminders = Array.isArray(deletedItems.reminders) ? deletedItems.reminders.slice() : [];
+  if (!deletedItems.reminders.includes(String(id))) {
+    deletedItems.reminders.push(String(id));
+  }
+  const wr = await persistReminders(reminders, false, deletedItems);
   if (wr.success) broadcastRemindersUpdated();
   return { success: wr.success, message: wr.success ? '提醒已删除' : (wr.message || '删除失败') };
 }
