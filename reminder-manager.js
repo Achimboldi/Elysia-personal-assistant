@@ -756,7 +756,10 @@ async function updateAfterFire(id, nowIso, status, manual) {
   const r = reminders[idx];
   r.lastTriggeredAt = nowIso;
   r.triggerCount = (r.triggerCount || 0) + 1;
-  r.updatedAt = nowIso;
+  // ★ 修复（2026-08-26）：触发提醒只应更新触发状态（lastTriggeredAt/triggerCount/history/nextTriggerAt），
+  //   不得提升 r.updatedAt。否则触发产生的"假新时间戳"会让另一台机器上的旧 schedule 版本在
+  //   云同步合并（mergeReminderLists 按 updatedAt 取胜者）中覆盖本机对提醒内容的真实修改
+  //   （表现为：修改提醒时间同步后，另一台电脑下载又变回旧时间）。
   if (!manual) {
     r.nextTriggerAt = computeNextTriggerIso(r);
   }
